@@ -1,0 +1,6 @@
+{
+  "name": "CampusMarket",
+  "description": "A modern student marketplace for buying and selling items within the campus, featuring AI-powered listing generation and secure seller verification.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}
