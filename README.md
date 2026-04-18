@@ -1,11 +1,23 @@
-<div align="center">
+# CampusMarket Deployment Guide (Vercel)
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+This project has been adapted for deployment on Vercel. 
 
-  <h1>Built with AI Studio</h2>
+## Vercel Setup
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+1.  **Framework Preset**: Ensure "Vite" is selected as the Framework Preset in your Vercel project settings.
+2.  **Environment Variables**: Add the following Environment Variables in the Vercel Dashboard:
+    *   `GEMINI_API_KEY`: Your Google AI API key (from Google AI Studio).
+    *   `VITE_APP_URL`: Your Vercel deployment URL (e.g., `https://campusmarket.vercel.app`).
+3.  **Routing**: A `vercel.json` has been added to handle Single Page Application (SPA) routing. This ensures that deep links (like `/market` or `/profile`) work correctly when refreshed.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## Firebase Configuration
 
-</div>
+1.  **Whitelisting**: Go to the [Firebase Console](https://console.firebase.google.com/), select your project, then navigate to **Authentication > Settings > Authorized Domains**.
+2.  **Add Domain**: Add your Vercel deployment domain (e.g., `campusmarket.vercel.app`) to the list of authorized domains. This is required for Google Sign-In to function.
+
+## Local Development
+
+```bash
+npm install
+npm run dev
+```

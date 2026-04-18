@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Student user profile with buyer and seller status",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "courseAndYear": { "type": "string" },
+        "studentId": { "type": "string" },
+        "universityEmail": { "type": "string", "format": "email" },
+        "bio": { "type": "string" },
+        "role": { "type": "string", "enum": ["buyer", "seller", "admin"] },
+        "isVerified": { "type": "boolean" },
+        "verificationStatus": { "type": "string", "enum": ["none", "pending", "approved", "rejected"] },
+        "studentIdImage": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "email", "role", "isVerified", "createdAt"]
+    },
+    "Listing": {
+      "title": "Product Listing",
+      "description": "An item or service for sale on campus",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "price": { "type": "number" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "sellerId": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "sold", "archived"] },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "price", "category", "sellerId", "status", "createdAt"]
+    },
+    "Chat": {
+      "title": "Chat Session",
+      "description": "A conversation between buyer and seller regarding a listing",
+      "type": "object",
+      "properties": {
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "listingId": { "type": "string" },
+        "listingTitle": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "lastMessageAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["participants", "listingId", "lastMessage", "lastMessageAt"]
+    },
+    "Favorite": {
+      "title": "Favorite Listing",
+      "description": "A listing marked as favorite by a user",
+      "type": "object",
+      "properties": {
+        "listingId": { "type": "string" },
+        "addedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["listingId", "addedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Student profiles"
+    },
+    "/users/{userId}/favorites/{listingId}": {
+      "schema": "Favorite",
+      "description": "User favorites"
+    },
+    "/listings/{listingId}": {
+      "schema": "Listing",
+      "description": "Public marketplace items"
+    },
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Messaging sessions"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "senderId": { "type": "string" },
+          "text": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "description": "Individual chat messages"
+    }
+  }
+}

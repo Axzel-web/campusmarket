@@ -1,0 +1,115 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- 0. Global Safety Net ---
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- 1. Global Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- 2. Validation Blueprints ---
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['fullName', 'email', 'role', 'isVerified', 'createdAt']) &&
+             data.fullName is string && data.fullName.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.role in ['buyer', 'seller', 'admin'] &&
+             data.isVerified is bool &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidListing(data) {
+      return data.keys().hasAll(['title', 'price', 'category', 'sellerId', 'status', 'createdAt']) &&
+             data.title is string && data.title.size() <= 150 &&
+             data.price is number && data.price >= 0 &&
+             data.category is string &&
+             data.sellerId == request.auth.uid &&
+             data.status in ['active', 'sold', 'archived'] &&
+             data.createdAt == (resource == null ? request.time : existing().createdAt);
+    }
+
+    function isValidChat(data) {
+      return data.participants is list && 
+             data.participants.size() == 2 &&
+             request.auth.uid in data.participants;
+    }
+
+    function isValidMessage(data) {
+      return data.senderId == request.auth.uid &&
+             data.text is string && data.text.size() <= 1000 &&
+             data.createdAt == request.time;
+    }
+
+    // --- 3. Collection Rules ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if false; // No bulk user scanning
+      
+      allow create: if isOwner(userId) && 
+                      isValidUserProfile(incoming()) && 
+                      incoming().isVerified == false && // Cannot self-verify
+                      incoming().role == 'buyer';      // Default role
+      
+      allow update: if isOwner(userId) && 
+                      isValidUserProfile(incoming()) &&
+                      incoming().isVerified == existing().isVerified && // Immutable verification
+                      incoming().role == existing().role &&             // Immutable role
+                      incoming().email == existing().email &&           // Immutable email
+                      incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'courseAndYear', 'studentId', 'universityEmail', 'bio', 'studentIdImage']);
+    }
+
+    match /users/{userId}/favorites/{listingId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /listings/{listingId} {
+      allow read: if isSignedIn();
+      allow create: if isEmailVerified() && isValidId(listingId) && isValidListing(incoming());
+      allow update: if isOwner(existing().sellerId) && 
+                      isValidListing(incoming()) &&
+                      incoming().sellerId == existing().sellerId &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'price', 'description', 'category', 'images', 'status', 'tags']);
+      allow delete: if isOwner(existing().sellerId);
+    }
+
+    match /chats/{chatId} {
+      allow read: if isSignedIn() && request.auth.uid in existing().participants;
+      allow create: if isEmailVerified() && isValidId(chatId) && isValidChat(incoming());
+      allow update: if isSignedIn() && request.auth.uid in existing().participants &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageAt']);
+      
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow create: if isEmailVerified() && isValidId(messageId) && isValidMessage(incoming()) &&
+                      request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+      }
+    }
+  }
+}
