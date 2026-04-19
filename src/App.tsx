@@ -33,6 +33,7 @@ import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication } fr
 import { cn } from './lib/utils';
 import { generateListingDetails } from './services/geminiService';
 import { SellerDashboard } from './components/SellerDashboard';
+import { SplineKeyboardLanding } from './spline-landing/SplineKeyboardLanding';
 
 import { 
   onAuthStateChanged, 
@@ -42,7 +43,8 @@ import {
   setPersistence,
   browserLocalPersistence,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  signInAnonymously
 } from 'firebase/auth';
 import { 
   collection, 
@@ -116,6 +118,7 @@ interface AppContextType {
   search: string;
   setSearch: (query: string) => void;
   login: () => Promise<void>;
+  continueAsGuest: () => Promise<void>;
   logout: () => void;
   updateProfile: (data: Partial<UserProfile>) => void;
   addListing: (listing: Omit<Listing, 'id' | 'createdAt' | 'sellerId' | 'sellerName' | 'views' | 'inquiries' | 'status'>, imageFiles: File[]) => Promise<void>;
@@ -154,7 +157,7 @@ const Navbar = () => {
       <div className="max-w-[1280px] mx-auto h-full flex items-center px-4 md:px-6 justify-between">
         <div className="flex items-center gap-4 md:gap-8 flex-1">
           {!showSearch && (
-            <Link to="/" className="text-xl md:text-2xl font-extrabold text-brand-primary tracking-tight whitespace-nowrap">CampusMarket</Link>
+            <Link to="/market" className="text-xl md:text-2xl font-extrabold text-brand-primary tracking-tight whitespace-nowrap">CampusMarket</Link>
           )}
           
           <div className={cn(
@@ -202,7 +205,7 @@ const Sidebar = () => {
   const { user } = useApp();
   
   const navItems = [
-    { icon: Home, label: 'Home Feed', path: '/' },
+    { icon: Home, label: 'Home Feed', path: '/market' },
     { icon: Filter, label: 'Categories', path: '/categories' },
     { icon: Heart, label: 'Favorites', path: '/favorites' },
     { icon: ShoppingBag, label: 'My Orders', path: '/purchases' },
@@ -394,7 +397,7 @@ const ListingCard = ({ listing }: { listing: Listing }) => {
 const MobileTabs = () => {
   const location = useLocation();
   const navItems = [
-    { icon: Home, path: '/' },
+    { icon: Home, path: '/market' },
     { icon: ShoppingBag, path: '/market' },
     { icon: PlusCircle, path: '/sell' },
     { icon: MessageSquare, path: '/messages' },
@@ -464,7 +467,7 @@ const FavoritesPage = () => {
         <div className="py-20 text-center">
           <Heart className="mx-auto text-text-muted mb-3 opacity-20" size={48} />
           <p className="text-text-muted text-sm font-medium">You haven't saved any items yet.</p>
-          <Link to="/" className="text-brand-primary text-xs font-bold hover:underline mt-2 inline-block">Browse Marketplace</Link>
+          <Link to="/market" className="text-brand-primary text-xs font-bold hover:underline mt-2 inline-block">Browse Marketplace</Link>
         </div>
       )}
     </div>
@@ -624,6 +627,14 @@ const HomePage = () => {
   );
 };
 
+const LandingPage = () => {
+  const { user } = useApp();
+
+  if (user) return <Navigate to="/market" replace />;
+
+  return <SplineKeyboardLanding />;
+};
+
 const themes = [
   { background: "#1A1A2E", color: "#FFFFFF", primaryColor: "#0F3460" },
   { background: "#461220", color: "#FFFFFF", primaryColor: "#E94560" },
@@ -635,7 +646,7 @@ const themes = [
 ];
 
 const LoginPage = () => {
-  const { login, user } = useApp();
+  const { login, user, continueAsGuest } = useApp();
   const [loggingIn, setLoggingIn] = useState(false);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
@@ -643,7 +654,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [theme, setTheme] = useState(themes[6]); // Default to Mint
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/market" replace />;
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -667,6 +678,15 @@ const LoginPage = () => {
     setLoggingIn(true);
     try {
       await login();
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleContinueAsGuest = async () => {
+    setLoggingIn(true);
+    try {
+      await continueAsGuest();
     } finally {
       setLoggingIn(false);
     }
@@ -795,6 +815,15 @@ const LoginPage = () => {
               ) : (
                 mode === 'signup' ? 'REGISTER' : 'ENTER'
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleContinueAsGuest}
+              disabled={loggingIn}
+              className="w-full py-2.5 rounded-xl text-[8px] sm:text-[9px] font-bold tracking-[0.2em] uppercase opacity-50 hover:opacity-100 transition-opacity disabled:opacity-30 border border-current border-opacity-15"
+            >
+              Continue as Guest
             </button>
           </form>
 
@@ -1581,6 +1610,11 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
           createdAt: serverTimestamp()
         };
         await setDoc(userRef, profileData);
+        setUser({
+          ...profileData,
+          createdAt: Date.now(),
+          id: fbUser.uid
+        } as UserProfile);
       }
       setLoading(false);
     }, (err) => {
@@ -1709,6 +1743,14 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
       await signInWithPopup(auth, provider);
     } catch (error) {
       console.error("Login Error:", error);
+    }
+  };
+
+  const continueAsGuest = async () => {
+    try {
+      await signInAnonymously(auth);
+    } catch (error) {
+      console.error("Guest sign-in error:", error);
     }
   };
 
@@ -1904,7 +1946,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
   return (
     <AppContext.Provider value={{ 
       user, loading, listings, favorites, reviews, chats, messages, search, setSearch,
-      login, logout, updateProfile, addListing, updateListing, deleteListing, markAsSold, toggleFavorite, createChat, sendMessage,
+      login, continueAsGuest, logout, updateProfile, addListing, updateListing, deleteListing, markAsSold, toggleFavorite, createChat, sendMessage,
       replyToReview, archiveReview, reportReview,
       sellerApplication, submitSellerApplication
     }}>
@@ -2048,6 +2090,7 @@ export default function App() {
       <Router>
         <AnimatePresence mode="wait">
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/*" element={
               <ProtectedRoute>
@@ -2057,7 +2100,6 @@ export default function App() {
                     <Sidebar />
                     <main className="flex-1 flex flex-col pb-20 md:pb-0 overflow-y-auto">
                       <Routes>
-                        <Route path="/" element={<HomePage />} />
                         <Route path="/market" element={<HomePage />} />
                         <Route path="/categories" element={<CategoriesPage />} />
                         <Route path="/favorites" element={<FavoritesPage />} />
@@ -2086,6 +2128,6 @@ export default function App() {
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useApp();
   if (loading) return null;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
