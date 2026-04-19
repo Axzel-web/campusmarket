@@ -19,19 +19,20 @@ import {
   ShoppingBag, 
   ChevronRight,
   Camera,
-  CheckCircle,
-  AlertCircle,
   LogOut,
   ArrowLeft,
   Filter,
   Star,
   ShieldCheck,
   Send,
-  Sparkles
+  Sparkles,
+  BarChart3,
+  Archive
 } from 'lucide-react';
-import { UserProfile, Listing, Chat, ChatMessage, Favorite } from './types';
+import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication } from './types';
 import { cn } from './lib/utils';
 import { generateListingDetails } from './services/geminiService';
+import { SellerDashboard } from './components/SellerDashboard';
 
 import { 
   onAuthStateChanged, 
@@ -40,9 +41,8 @@ import {
   signOut,
   setPersistence,
   browserLocalPersistence,
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  User as FirebaseUser
+  createUserWithEmailAndPassword
 } from 'firebase/auth';
 import { 
   collection, 
@@ -56,10 +56,12 @@ import {
   addDoc,
   serverTimestamp,
   getDoc,
-  Timestamp,
-  getDocFromServer
+  deleteDoc,
+  getDocFromServer,
+  increment
 } from 'firebase/firestore';
-import { auth, db } from './lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from './lib/firebase';
 
 // --- Error Helper ---
 
@@ -108,6 +110,7 @@ interface AppContextType {
   loading: boolean;
   listings: Listing[];
   favorites: string[];
+  reviews: Review[];
   chats: Chat[];
   messages: ChatMessage[];
   search: string;
@@ -115,10 +118,18 @@ interface AppContextType {
   login: () => Promise<void>;
   logout: () => void;
   updateProfile: (data: Partial<UserProfile>) => void;
-  addListing: (listing: Omit<Listing, 'id' | 'createdAt'>) => void;
+  addListing: (listing: Omit<Listing, 'id' | 'createdAt' | 'sellerId' | 'sellerName' | 'views' | 'inquiries' | 'status'>, imageFiles: File[]) => Promise<void>;
+  updateListing: (listingId: string, data: Partial<Listing>) => Promise<void>;
+  deleteListing: (listingId: string) => Promise<void>;
+  markAsSold: (listingId: string) => Promise<void>;
   toggleFavorite: (listingId: string) => void;
   createChat: (listing: Listing) => string;
   sendMessage: (chatId: string, text: string) => void;
+  replyToReview: (reviewId: string, text: string) => void;
+  archiveReview: (reviewId: string) => void;
+  reportReview: (reviewId: string, reason: string) => void;
+  sellerApplication: SellerApplication | null;
+  submitSellerApplication: (data: Omit<SellerApplication, 'userId' | 'status' | 'createdAt'>) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -188,12 +199,15 @@ const Navbar = () => {
 
 const Sidebar = () => {
   const location = useLocation();
+  const { user } = useApp();
+  
   const navItems = [
     { icon: Home, label: 'Home Feed', path: '/' },
     { icon: Filter, label: 'Categories', path: '/categories' },
     { icon: Heart, label: 'Favorites', path: '/favorites' },
     { icon: ShoppingBag, label: 'My Orders', path: '/purchases' },
     { icon: MessageSquare, label: 'Messages', path: '/messages' },
+    ...(user?.role === 'seller' ? [{ icon: BarChart3, label: 'Reviews', path: '/dashboard' }] : []),
     { icon: User, label: 'Profile', path: '/profile' },
     { icon: ShieldCheck, label: 'Verification', path: '/verify' },
   ];
@@ -257,23 +271,45 @@ const RightPanel = () => {
       {/* Seller Hub / Verification Widget */}
       <div className={cn(
         "rounded-xl p-4 border",
-        user?.isVerified ? "bg-white border-border-main" : "bg-accent-yellow border-border-yellow"
+        user?.isVerified ? "bg-white border-border-main" : 
+        user?.verificationStatus === 'pending' ? "bg-amber-50 border-amber-200" :
+        "bg-accent-yellow border-border-yellow"
       )}>
         <h3 className="text-[11px] font-bold text-text-muted uppercase tracking-widest mb-3 flex items-center gap-1.5 font-sans">
-          <ShieldCheck size={14} className={user?.isVerified ? "text-green-500" : "text-brand-primary"} /> 
+          <ShieldCheck size={14} className={user?.isVerified ? "text-green-500" : user?.verificationStatus === 'pending' ? "text-amber-500" : "text-brand-primary"} /> 
           Seller Dashboard
         </h3>
-        {user?.isVerified ? (
+        {user?.verificationStatus === 'pending' ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-amber-600">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Pending Approval
+            </div>
+            <p className="text-[11px] text-text-muted leading-relaxed">Your student ID is under review. We'll notify you once you're approved to sell.</p>
+          </div>
+        ) : user?.verificationStatus === 'rejected' ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-red-600">
+              <span className="w-2 h-2 rounded-full bg-red-500"></span> Application Rejected
+            </div>
+            <p className="text-[11px] text-text-muted leading-relaxed mb-2">There was an issue with your ID. Please check your profile for details.</p>
+            <button 
+              onClick={() => navigate('/verify')}
+              className="w-full py-2 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50 transition-colors"
+            >
+              Update and Resubmit
+            </button>
+          </div>
+        ) : user?.isVerified ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium text-text-main">
               <span className="w-2 h-2 rounded-full bg-green-500"></span> Verified Seller
             </div>
-            <p className="text-[11px] text-text-muted">You have 0 active listings.</p>
+            <p className="text-[11px] text-text-muted">You have {listings.filter(l => l.sellerId === user.id).length} active listings.</p>
             <button 
-              onClick={() => navigate('/sell')}
+              onClick={() => navigate('/dashboard')}
               className="w-full py-2 border border-border-main text-xs font-bold rounded-lg hover:bg-bg-light transition-colors mt-2"
             >
-              Post New Item
+              Seller Dashboard
             </button>
           </div>
         ) : (
@@ -595,7 +631,7 @@ const themes = [
   { background: "#F7B267", color: "#000000", primaryColor: "#F4845F" },
   { background: "#F25F5C", color: "#000000", primaryColor: "#642B36" },
   { background: "#231F20", color: "#FFFFFF", primaryColor: "#BB4430" },
-  { background: "#eff6ff", color: "#1e3a8a", primaryColor: "#3b82f6" } // Blue Theme
+  { background: "#FAFDFB", color: "#064e3b", primaryColor: "#10b981" } // Added Mint Theme
 ];
 
 const LoginPage = () => {
@@ -936,7 +972,7 @@ const ProfilePage = () => {
 };
 
 const VerificationPage = () => {
-  const { user, updateProfile } = useApp();
+  const { user, submitSellerApplication } = useApp();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     fullName: user?.fullName || '',
@@ -947,17 +983,69 @@ const VerificationPage = () => {
     contactDetails: '',
     image: null as string | null
   });
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { image, ...profileData } = formData;
-    updateProfile({
-      ...profileData,
-      verificationStatus: 'pending',
-      studentIdImage: image || 'uploaded_image_url'
-    });
-    navigate('/profile');
+    setSubmitting(true);
+    try {
+      await submitSellerApplication({
+        fullName: formData.fullName,
+        school: formData.courseAndYear,
+        contactLink: formData.contactDetails,
+        photoURL: formData.image || 'uploaded_image_url', // In a real app, this would be a Storage URL
+      });
+      navigate('/profile');
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit application. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (user?.role === 'seller' || user?.verificationStatus === 'approved') {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-bg-light">
+        <div className="bg-white p-10 rounded-[40px] border border-border-main shadow-xl max-w-sm w-full space-y-6">
+          <div className="w-24 h-24 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
+            <ShieldCheck size={48} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-text-main leading-tight mb-2">You're Verified!</h2>
+            <p className="text-text-muted text-sm font-medium">Your student identity has been verified. You have full access to the seller tools and marketplace features.</p>
+          </div>
+          <div className="pt-4 space-y-3">
+            <Link to="/sell" className="w-full flex items-center justify-center gap-2 py-3.5 bg-brand-primary text-white rounded-2xl font-black shadow-lg shadow-brand-primary/20 hover:translate-y-[-2px] transition-all">
+              <ShoppingBag size={18} /> Post an Item
+            </Link>
+            <button onClick={() => navigate('/dashboard')} className="w-full py-3.5 bg-bg-light text-text-main border border-border-main rounded-2xl font-bold hover:bg-white transition-all">
+              Seller Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (user?.verificationStatus === 'pending') {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-bg-light">
+        <div className="bg-white p-10 rounded-[40px] border border-border-main shadow-xl max-w-sm w-full space-y-6">
+          <div className="w-24 h-24 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
+            <Sparkles size={48} className="animate-pulse" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-text-main leading-tight mb-2">Review in Progress</h2>
+            <p className="text-text-muted text-sm font-medium">We're reviewing your student verification. This typically takes 12-24 hours. We'll notify you once you're approved!</p>
+          </div>
+          <button onClick={() => navigate('/profile')} className="w-full py-3.5 bg-brand-primary text-white rounded-2xl font-black shadow-lg shadow-brand-primary/20">
+            Back to Profile
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 px-6 py-6 overflow-y-auto no-scrollbar">
@@ -991,11 +1079,11 @@ const VerificationPage = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-text-muted uppercase tracking-widest mb-1.5 ml-1">University Email (@edu.ph)</label>
+                <label className="block text-xs font-bold text-text-muted uppercase tracking-widest mb-1.5 ml-1">University Email (Gmail supported)</label>
                 <input 
                   required
                   type="email"
-                  placeholder="name@university.edu"
+                  placeholder="name@gmail.com"
                   className="w-full h-12 px-4 rounded-xl bg-bg-light border border-border-main focus:bg-white focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all outline-none text-sm font-medium"
                   value={formData.universityEmail}
                   onChange={e => setFormData({...formData, universityEmail: e.target.value})}
@@ -1018,7 +1106,7 @@ const VerificationPage = () => {
                 <label className="block text-xs font-bold text-text-muted uppercase tracking-widest mb-1.5 ml-1">Student ID Number</label>
                 <input 
                   required
-                  placeholder="20XX-XXXXX-XX-0"
+                  placeholder="23-10223"
                   className="w-full h-12 px-4 rounded-xl bg-bg-light border border-border-main focus:bg-white focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all outline-none text-sm font-medium"
                   value={formData.studentId}
                   onChange={e => setFormData({...formData, studentId: e.target.value})}
@@ -1077,9 +1165,10 @@ const VerificationPage = () => {
 
           <button 
             type="submit"
-            className="w-full py-4 bg-brand-primary text-white rounded-2xl font-black shadow-xl shadow-brand-primary/20 hover:bg-brand-primary-hover active:scale-[0.98] transition-all"
+            disabled={submitting}
+            className="w-full py-4 bg-brand-primary text-white rounded-2xl font-black shadow-xl shadow-brand-primary/20 hover:bg-brand-primary-hover active:scale-[0.98] transition-all disabled:opacity-50"
           >
-            Submit for Review
+            {submitting ? 'Submitting...' : 'Submit for Review'}
           </button>
         </form>
       </div>
@@ -1091,158 +1180,260 @@ const SellPage = () => {
   const { user, addListing } = useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     title: '',
     price: '',
     description: '',
-    category: 'Others',
+    category: 'Gadgets',
+    condition: 'Used' as 'New' | 'Used',
+    quantity: '1',
+    location: '',
+    contactMethod: '',
     tags: [] as string[]
   });
 
-  if (!user?.isVerified) {
+  const isApprovedSeller = user?.role === 'seller' && user?.verificationStatus === 'approved';
+
+  if (!isApprovedSeller) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center p-6 text-center">
+      <div className="h-[calc(100vh-64px)] flex flex-col items-center justify-center p-6 text-center bg-white">
         <div className="w-20 h-20 bg-accent-subtle text-brand-primary rounded-3xl flex items-center justify-center mb-6">
           <ShieldCheck size={40} />
         </div>
-        <h1 className="text-2xl font-bold mb-2 text-text-main">Seller Verification Required</h1>
-        <p className="text-text-muted mb-8 max-w-sm">You need to be a verified student seller to post items in the marketplace.</p>
+        <h1 className="text-2xl font-bold mb-2 text-text-main">Complete Seller Verification</h1>
+        <p className="text-text-muted mb-8 max-w-sm">To keep CampusMarket safe, only verified students can sell products. Complete your verification to start listing.</p>
         <Link to="/verify" className="px-8 py-3 bg-brand-primary text-white rounded-xl font-bold shadow-lg scale-100 active:scale-95 transition-all">
-          Verify My Account
+          Go to Verification
         </Link>
       </div>
     );
   }
 
-  const handleAIHelp = async () => {
-    if (!formData.description) return;
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    setImageFiles(prev => [...prev, ...files]);
+    
+    files.forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (imageFiles.length === 0) {
+      alert("Please upload at least one product image.");
+      return;
+    }
+    
     setLoading(true);
     try {
-      const suggested = await generateListingDetails(formData.description);
-      setFormData({
-        ...formData,
-        title: suggested.title,
-        price: suggested.suggestedPrice.toString(),
-        description: suggested.description,
-        category: suggested.category,
-        tags: suggested.tags
-      });
-    } catch (e) {
-      alert("AI Assistant failed. Please try again.");
+      await addListing({
+        title: formData.title,
+        price: Number(formData.price),
+        description: formData.description,
+        category: formData.category,
+        condition: formData.condition,
+        quantity: Number(formData.quantity),
+        location: formData.location,
+        contactMethod: formData.contactMethod,
+        tags: formData.tags,
+        images: [] // images handled inside addListing
+      }, imageFiles);
+      
+      navigate('/dashboard');
+    } catch (err) {
+      console.error(err);
+      alert("Failed to post listing. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    addListing({
-      title: formData.title,
-      price: parseFloat(formData.price),
-      description: formData.description,
-      category: formData.category,
-      images: [], // In real app, upload multiple images
-      sellerId: user.id,
-      sellerName: user.fullName,
-      status: 'active',
-      tags: formData.tags
-    });
-    navigate('/market');
-  };
-
   return (
-    <div className="flex-1 px-6 py-6 overflow-y-auto no-scrollbar">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-text-main">Sell Item</h1>
-        <button 
-          onClick={handleAIHelp}
-          disabled={loading || !formData.description}
-          className="flex items-center gap-2 px-4 py-2 bg-accent-subtle text-brand-primary rounded-full text-xs font-bold hover:bg-brand-primary/10 transition-colors disabled:opacity-50"
-        >
-          <Sparkles size={14} className={loading ? "animate-spin" : ""} />
-          {loading ? "Thinking..." : "AI Assistant"}
-        </button>
+    <div className="flex-1 px-6 py-6 overflow-y-auto no-scrollbar max-w-4xl mx-auto w-full">
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-black text-text-main">Post New Item</h1>
+          <p className="text-text-muted text-sm font-medium mt-1">List your product in the campus marketplace.</p>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-white p-6 rounded-3xl border border-border-main shadow-sm space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-text-main mb-1">Item Title</label>
-            <input 
-              required
-              placeholder="e.g. MacBook Pro M1 2020"
-              className="w-full h-11 px-4 rounded-xl bg-bg-light border border-border-main focus:bg-white focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all font-semibold outline-none"
-              value={formData.title}
-              onChange={e => setFormData({...formData, title: e.target.value})}
-            />
+      <form onSubmit={handleSubmit} className="space-y-8 pb-10">
+        {/* Images Selection */}
+        <div className="bg-white p-6 md:p-8 rounded-3xl border border-border-main shadow-sm space-y-4">
+          <label className="block text-xs font-black text-text-muted uppercase tracking-widest ml-1">Product Images</label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {previews.map((src, index) => (
+              <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-border-main group">
+                <img src={src} alt="Preview" className="w-full h-full object-cover" />
+                <button 
+                  type="button"
+                  onClick={() => removeImage(index)}
+                  className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Archive size={14} />
+                </button>
+              </div>
+            ))}
+            {previews.length < 4 && (
+              <label className="relative aspect-square rounded-2xl bg-bg-light border-2 border-dashed border-border-main flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-white hover:border-brand-primary/50 transition-all text-text-muted hover:text-brand-primary">
+                <Camera size={24} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">Add Photo</span>
+                <input type="file" multiple accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} />
+              </label>
+            )}
           </div>
+          <p className="text-[10px] text-text-muted font-medium italic">Tip: Bright, clear photos help items sell 2x faster.</p>
+        </div>
 
-          <div className="grid grid-cols-2 gap-4">
-             <div>
-              <label className="block text-sm font-medium text-text-main mb-1">Price (₱)</label>
+        {/* Basic Details */}
+        <div className="bg-white p-6 md:p-8 rounded-3xl border border-border-main shadow-sm space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-black text-text-muted uppercase tracking-widest mb-2 ml-1">Product Name</label>
+              <input 
+                required
+                className="w-full h-12 px-4 rounded-xl bg-bg-light border border-border-main focus:bg-white focus:ring-2 focus:ring-brand-primary/10 transition-all font-bold outline-none"
+                value={formData.title}
+                onChange={e => setFormData({...formData, title: e.target.value})}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-black text-text-muted uppercase tracking-widest mb-2 ml-1">Category</label>
+              <select 
+                className="w-full h-12 px-4 rounded-xl bg-bg-light border border-border-main focus:bg-white transition-all outline-none font-bold"
+                value={formData.category}
+                onChange={e => setFormData({...formData, category: e.target.value})}
+              >
+                {['Gadgets', 'Books', 'Uniforms', 'Services', 'Others'].map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-black text-text-muted uppercase tracking-widest mb-2 ml-1">Price (₱)</label>
               <input 
                 required
                 type="number"
-                placeholder="0.00"
-                className="w-full h-11 px-4 rounded-xl bg-bg-light border border-border-main focus:bg-white focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all font-bold outline-none"
+                className="w-full h-12 px-4 rounded-xl bg-bg-light border border-border-main focus:bg-white transition-all font-black outline-none text-brand-primary"
                 value={formData.price}
                 onChange={e => setFormData({...formData, price: e.target.value})}
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-text-main mb-1">Category</label>
-              <select 
-                className="w-full h-11 px-4 rounded-xl bg-bg-light border border-border-main focus:bg-white focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all outline-none"
-                value={formData.category}
-                onChange={e => setFormData({...formData, category: e.target.value})}
-              >
-                {['Gadgets', 'Books', 'Uniforms', 'Services', 'Others'].map(c => (
-                  <option key={c} value={c}>{c}</option>
+              <label className="block text-xs font-black text-text-muted uppercase tracking-widest mb-2 ml-1">Condition</label>
+              <div className="flex gap-2">
+                {(['New', 'Used'] as const).map((cond) => (
+                  <button
+                    key={cond}
+                    type="button"
+                    onClick={() => setFormData({...formData, condition: cond})}
+                    className={cn(
+                      "flex-1 py-2.5 rounded-xl border font-bold text-xs transition-all",
+                      formData.condition === cond 
+                        ? "bg-brand-primary text-white border-brand-primary shadow-md"
+                        : "bg-bg-light text-text-muted border-border-main hover:border-brand-primary"
+                    )}
+                  >
+                    {cond}
+                  </button>
                 ))}
-              </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-black text-text-muted uppercase tracking-widest mb-2 ml-1">Quantity</label>
+              <input 
+                required
+                type="number"
+                min="1"
+                className="w-full h-12 px-4 rounded-xl bg-bg-light border border-border-main focus:bg-white transition-all font-bold outline-none"
+                value={formData.quantity}
+                onChange={e => setFormData({...formData, quantity: e.target.value})}
+              />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-main mb-1">Description</label>
-            <p className="text-[10px] text-text-muted mb-2 font-medium">Pro tip: Write a short note and click AI Assistant to polish it!</p>
+            <label className="block text-xs font-black text-text-muted uppercase tracking-widest mb-2 ml-1">Campus Meetup Location</label>
+            <input 
+              required
+              placeholder="e.g. Near PLSP Gate 1 or Student Center"
+              className="w-full h-12 px-4 rounded-xl bg-bg-light border border-border-main focus:bg-white transition-all font-medium outline-none"
+              value={formData.location}
+              onChange={e => setFormData({...formData, location: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-black text-text-muted uppercase tracking-widest mb-2 ml-1">Contact Method</label>
+            <input 
+              required
+              placeholder="e.g. In-app chat, Messenger link, or Phone Number"
+              className="w-full h-12 px-4 rounded-xl bg-bg-light border border-border-main focus:bg-white transition-all font-medium outline-none"
+              value={formData.contactMethod}
+              onChange={e => setFormData({...formData, contactMethod: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-black text-text-muted uppercase tracking-widest mb-2 ml-1">Item Description</label>
             <textarea 
               required
-              placeholder="Briefly describe what you're selling..."
-              className="w-full p-4 rounded-xl bg-bg-light border border-border-main focus:bg-white focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all min-h-[150px] outline-none"
+              className="w-full p-4 rounded-2xl bg-bg-light border border-border-main focus:bg-white transition-all min-h-[150px] outline-none font-medium leading-relaxed"
               value={formData.description}
               onChange={e => setFormData({...formData, description: e.target.value})}
             ></textarea>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text-main mb-2">Item Photos</label>
-            <div className="flex gap-2">
-              <div className="w-20 h-20 rounded-xl bg-bg-light border-2 border-dashed border-border-main flex items-center justify-center text-text-muted hover:text-brand-primary hover:border-brand-primary/50 cursor-pointer transition-all">
-                <Camera size={24} />
-              </div>
-            </div>
           </div>
         </div>
 
         <button 
           type="submit"
-          className="w-full py-4 bg-brand-primary text-white rounded-2xl font-bold shadow-lg shadow-brand-primary/20 hover:bg-brand-primary-hover transition-colors"
+          disabled={loading}
+          className="w-full py-4 bg-brand-primary text-white rounded-2xl font-black shadow-xl shadow-brand-primary/20 hover:bg-brand-primary-hover active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          Post Listing
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          ) : (
+            <>Post Product for Sale</>
+          )}
         </button>
       </form>
     </div>
   );
 };
 
-const ListingDetail = () => {
-  const { id } = useParams<{ id: string }>();
-  const { listings, user, createChat } = useApp();
-  const navigate = useNavigate();
-  const listing = listings.find(l => l.id === id);
-
-  if (!listing) return null;
+  const ListingDetail = () => {
+    const { id } = useParams<{ id: string }>();
+    const { listings, user, createChat } = useApp();
+    const navigate = useNavigate();
+    const listing = listings.find(l => l.id === id);
+  
+    useEffect(() => {
+      if (id && user && listing && listing.sellerId !== user.id) {
+        // Increment views
+        const listingRef = doc(db, 'listings', id);
+        updateDoc(listingRef, {
+          views: increment(1)
+        }).catch(console.error);
+      }
+    }, [id, user?.id]);
+  
+    if (!listing) return null;
 
   const handleMessage = () => {
     const chatId = createChat(listing);
@@ -1317,81 +1508,92 @@ const ListingDetail = () => {
 
 // --- App Provider ---
 
+const toMillis = (timestamp: any): number => {
+  if (!timestamp) return Date.now();
+  if (typeof timestamp === 'number') return timestamp;
+  if (timestamp.toMillis) return timestamp.toMillis();
+  return Date.now();
+};
+
 const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [fbUser, setFbUser] = useState<any>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [sellerApplication, setSellerApplication] = useState<SellerApplication | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages] = useState<ChatMessage[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // Connection Test
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error: any) {
+        if (error.message?.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration.");
+        }
+      }
+    };
+    testConnection();
+  }, []);
+
   // Sync Auth State
   useEffect(() => {
-    // Check if Firebase is initialized
-    if (!auth) {
-      console.error('Firebase auth not initialized');
-      setLoading(false);
-      return;
-    }
-
-    // Explicitly set persistence to local to speed up re-entry
     setPersistence(auth, browserLocalPersistence).catch(console.error);
+    const unsubscribe = onAuthStateChanged(auth, (fUser) => {
+      setFbUser(fUser);
+      if (!fUser) {
+        setUser(null);
+        setLoading(false);
+      }
+    });
+    return unsubscribe;
+  }, []);
 
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (fbUser) {
-        // Optimistically set a partial user to show UI faster
-        setUser(prev => prev || ({
-          id: fbUser.uid,
+  // Sync User Profile Real-time
+  useEffect(() => {
+    if (!fbUser) return;
+    
+    const userRef = doc(db, 'users', fbUser.uid);
+    const unsubscribe = onSnapshot(userRef, async (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setUser({ 
+          ...data, 
+          role: typeof data.role === 'string' ? data.role.trim() : data.role,
+          verificationStatus: typeof data.verificationStatus === 'string' ? data.verificationStatus.trim() : data.verificationStatus,
+          createdAt: toMillis(data.createdAt), 
+          id: fbUser.uid 
+        } as UserProfile);
+      } else {
+        // Create initial profile if it doesn't exist
+        const profileData = {
           email: fbUser.email || '',
           fullName: fbUser.displayName || 'CAMPUS STUDENT',
           courseAndYear: '',
           role: 'buyer',
           isVerified: false,
           verificationStatus: 'none',
-          createdAt: Date.now()
-        } as UserProfile));
-
-        // Sync user profile from Firestore in the background
-        if (db) {
-          const userRef = doc(db, 'users', fbUser.uid);
-          
-          try {
-            // Use a faster getDoc (cached if available)
-            const userSnap = await getDoc(userRef);
-            
-            if (userSnap.exists()) {
-              setUser(userSnap.data() as UserProfile);
-            } else {
-              // Create initial profile if it doesn't exist
-              const newProfile: UserProfile = {
-                id: fbUser.uid,
-                email: fbUser.email || '',
-                fullName: fbUser.displayName || 'CAMPUS STUDENT',
-                courseAndYear: '',
-                role: 'buyer',
-                isVerified: false,
-                verificationStatus: 'none',
-                createdAt: Date.now()
-              };
-              await setDoc(userRef, newProfile);
-              setUser(newProfile);
-            }
-          } catch (e) {
-            console.error("Profile sync error:", e);
-          }
-        }
-      } else {
-        setUser(null);
+          createdAt: serverTimestamp()
+        };
+        await setDoc(userRef, profileData);
       }
       setLoading(false);
+    }, (err) => {
+      console.error("Profile sync error:", err);
+      setLoading(false);
     });
+
     return unsubscribe;
-  }, []);
+  }, [fbUser]);
 
   // Sync Listings
   useEffect(() => {
-    if (!user || !db) {
+    if (!user) {
       setListings([]);
       return;
     }
@@ -1401,7 +1603,11 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
       orderBy('createdAt', 'desc')
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Listing));
+      const data = snapshot.docs.map(d => ({ 
+        ...d.data(), 
+        id: d.id, 
+        createdAt: toMillis(d.data().createdAt) 
+      } as Listing));
       setListings(data);
     }, (error) => {
       console.error("Listings sync error:", error);
@@ -1409,9 +1615,73 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     return unsubscribe;
   }, [user]);
 
+  // Sync Favorites
+  useEffect(() => {
+    if (!user) {
+      setFavorites([]);
+      return;
+    }
+    const q = collection(db, 'users', user.id, 'favorites');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setFavorites(snapshot.docs.map(d => d.id));
+    }, (error) => {
+      console.error("Favorites sync error:", error);
+    });
+    return unsubscribe;
+  }, [user]);
+
+  // Sync Reviews
+  useEffect(() => {
+    if (!user) {
+      setReviews([]);
+      return;
+    }
+    const q = query(
+      collection(db, 'reviews'),
+      where('sellerId', '==', user.id),
+      orderBy('createdAt', 'desc')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(d => ({
+        ...d.data(),
+        id: d.id,
+        createdAt: toMillis(d.data().createdAt),
+        approvedAt: toMillis(d.data().approvedAt)
+      } as Review));
+      setReviews(data);
+    }, (error) => {
+      console.error("Reviews sync error:", error);
+    });
+    return unsubscribe;
+  }, [user]);
+
+  // Sync Seller Application
+  useEffect(() => {
+    if (!user) {
+      setSellerApplication(null);
+      return;
+    }
+    const unsubscribe = onSnapshot(doc(db, 'sellerApplications', user.id), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setSellerApplication({ 
+          ...data, 
+          status: typeof data.status === 'string' ? data.status.trim() : data.status,
+          createdAt: toMillis(data.createdAt), 
+          userId: user.id 
+        } as SellerApplication);
+      } else {
+        setSellerApplication(null);
+      }
+    }, (error) => {
+       console.error("Application sync error:", error);
+    });
+    return unsubscribe;
+  }, [user]);
+
   // Sync Chats
   useEffect(() => {
-    if (!user || !db) {
+    if (!user) {
       setChats([]);
       return;
     }
@@ -1421,7 +1691,11 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
       orderBy('lastMessageAt', 'desc')
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Chat));
+      const data = snapshot.docs.map(d => ({ 
+        ...d.data(), 
+        id: d.id, 
+        lastMessageAt: toMillis(d.data().lastMessageAt) 
+      } as Chat));
       setChats(data);
     }, (error) => {
       console.error("Chats sync error:", error);
@@ -1453,27 +1727,83 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const addListing = async (data: Omit<Listing, 'id' | 'createdAt'>) => {
+  const addListing = async (data: any, imageFiles: File[]) => {
     if (!user) return;
     try {
+      const imageUrls: string[] = [];
+      
+      // Upload images to storage
+      for (const file of imageFiles) {
+        const imageRef = ref(storage, `listings/${user.id}/${Date.now()}-${file.name}`);
+        const snapshot = await uploadBytes(imageRef, file);
+        const url = await getDownloadURL(snapshot.ref);
+        imageUrls.push(url);
+      }
+
       await addDoc(collection(db, 'listings'), {
         ...data,
+        images: imageUrls,
         sellerId: user.id,
         sellerName: user.fullName,
-        sellerRating: 4.5 + Math.random() * 0.5, // Random initial rating for demo
-        createdAt: Date.now()
+        sellerRating: 4.8, 
+        status: 'active',
+        views: 0,
+        inquiries: 0,
+        createdAt: serverTimestamp()
       });
     } catch (error) {
       handleFirestoreError(error, 'create', 'listings');
     }
   };
 
-  const toggleFavorite = (listingId: string) => {
-    setFavorites(prev => 
-      prev.includes(listingId) 
-        ? prev.filter(id => id !== listingId) 
-        : [...prev, listingId]
-    );
+  const updateListing = async (listingId: string, data: Partial<Listing>) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'listings', listingId), {
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      handleFirestoreError(error, 'update', `listings/${listingId}`);
+    }
+  };
+
+  const deleteListing = async (listingId: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'listings', listingId));
+    } catch (error) {
+      handleFirestoreError(error, 'delete', `listings/${listingId}`);
+    }
+  };
+
+  const markAsSold = async (listingId: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'listings', listingId), {
+        status: 'sold',
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      handleFirestoreError(error, 'update', `listings/${listingId}`);
+    }
+  };
+
+  const toggleFavorite = async (listingId: string) => {
+    if (!user) return;
+    try {
+      const favRef = doc(db, 'users', user.id, 'favorites', listingId);
+      if (favorites.includes(listingId)) {
+        await deleteDoc(favRef);
+      } else {
+        await setDoc(favRef, {
+          listingId,
+          addedAt: serverTimestamp()
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, 'write', `users/${user.id}/favorites/${listingId}`);
+    }
   };
 
   const createChat = async (listing: Listing) => {
@@ -1487,7 +1817,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
         listingId: listing.id,
         listingTitle: listing.title,
         lastMessage: 'Started a chat',
-        lastMessageAt: Date.now()
+        lastMessageAt: serverTimestamp()
       });
       return chatRef.id;
     } catch (error) {
@@ -1502,14 +1832,64 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
         senderId: user.id,
         text,
-        createdAt: Date.now()
+        createdAt: serverTimestamp()
       });
       await updateDoc(doc(db, 'chats', chatId), {
         lastMessage: text,
-        lastMessageAt: Date.now()
+        lastMessageAt: serverTimestamp()
       });
     } catch (error) {
       handleFirestoreError(error, 'create', `chats/${chatId}/messages`);
+    }
+  };
+
+  const replyToReview = async (reviewId: string, text: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'reviews', reviewId), {
+        sellerReply: text
+      });
+    } catch (error) {
+      handleFirestoreError(error, 'update', `reviews/${reviewId}`);
+    }
+  };
+
+  const archiveReview = async (reviewId: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'reviews', reviewId), {
+        status: 'archived'
+      });
+    } catch (error) {
+      handleFirestoreError(error, 'update', `reviews/${reviewId}`);
+    }
+  };
+
+  const reportReview = async (reviewId: string, reason: string) => {
+    // In a real app, this would send a report to admins
+    console.log(`Review ${reviewId} reported for: ${reason}`);
+    alert("Review reported to campus moderators.");
+  };
+
+  const submitSellerApplication = async (data: Omit<SellerApplication, 'userId' | 'status' | 'createdAt'>) => {
+    if (!user) return;
+    try {
+      // 1. Save to sellerApplications collection as requested
+      const appRef = doc(db, 'sellerApplications', user.id);
+      await setDoc(appRef, {
+        ...data,
+        userId: user.id,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+
+      // 2. Update status in user profile for UI conditional rendering
+      // Note: role and isVerified are immutable by user in rules, but verificationStatus is allowed
+      await updateDoc(doc(db, 'users', user.id), {
+        verificationStatus: 'pending'
+      });
+    } catch (error) {
+       handleFirestoreError(error, 'write', `sellerApplications/${user.id}`);
     }
   };
 
@@ -1523,8 +1903,10 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AppContext.Provider value={{ 
-      user, loading, listings, favorites, chats, messages, search, setSearch,
-      login, logout, updateProfile, addListing, toggleFavorite, createChat, sendMessage 
+      user, loading, listings, favorites, reviews, chats, messages, search, setSearch,
+      login, logout, updateProfile, addListing, updateListing, deleteListing, markAsSold, toggleFavorite, createChat, sendMessage,
+      replyToReview, archiveReview, reportReview,
+      sellerApplication, submitSellerApplication
     }}>
       {children}
     </AppContext.Provider>
@@ -1544,10 +1926,14 @@ const ChatPage = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        if (!id || !db) return;
+        if (!id) return;
         const q = query(collection(db, 'chats', id, 'messages'), orderBy('createdAt', 'asc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as ChatMessage));
+            const data = snapshot.docs.map(d => ({ 
+              ...d.data(), 
+              id: d.id, 
+              createdAt: toMillis(d.data().createdAt) 
+            } as ChatMessage));
             setMessages(data);
         });
         return unsubscribe;
@@ -1566,44 +1952,56 @@ const ChatPage = () => {
                    <p className="text-xs text-slate-500">Messaging Seller</p>
                 </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {messages.length === 0 && (
-                    <p className="text-center text-slate-400 text-sm py-8">No messages yet. Start the conversation!</p>
-                )}
-                {messages.map(msg => (
-                    <div key={msg.id} className={`flex ${msg.senderId === user.id ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-xs px-4 py-2 rounded-lg ${msg.senderId === user.id ? 'bg-brand-primary text-white' : 'bg-slate-100 text-slate-900'}`}>
-                            <p className="text-sm">{msg.text}</p>
-                        </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages.map(m => (
+                    <div key={m.id} className={cn(
+                        "max-w-[80%] p-3 rounded-2xl text-sm font-medium",
+                        m.senderId === user.id ? "ml-auto bg-brand-primary text-white rounded-tr-none shadow-sm" : "bg-bg-light text-text-main border border-border-main rounded-tl-none"
+                    )}>
+                        {m.text}
                     </div>
                 ))}
             </div>
-            <div className="p-4 border-t flex gap-2">
-                <input 
-                    type="text"
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder="Type a message..."
-                    className="flex-1 px-4 py-2 border rounded-lg outline-none focus:border-brand-primary"
-                    onKeyPress={(e) => {
-                        if (e.key === 'Enter' && text) {
-                            sendMessage(id!, text);
-                            setText('');
-                        }
-                    }}
-                />
-                <button 
-                    onClick={() => {
-                        sendMessage(id!, text);
+
+            <div className="p-4 border-t border-border-main pb-safe">
+                <form className="flex gap-2" onSubmit={(e) => {
+                    e.preventDefault();
+                    if (text.trim()) {
+                        sendMessage(chat.id, text);
                         setText('');
-                    }}
-                    className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:opacity-90"
-                >
-                    <Send size={18} />
-                </button>
+                    }
+                }}>
+                    <input 
+                        className="flex-1 h-11 px-4 rounded-xl bg-bg-light border border-border-main focus:bg-white focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all text-sm outline-none"
+                        placeholder="Type a message..."
+                        value={text}
+                        onChange={e => setText(e.target.value)}
+                    />
+                    <button type="submit" className="w-11 h-11 bg-brand-primary text-white rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20 hover:bg-brand-primary-hover transition-all">
+                        <Send size={18} />
+                    </button>
+                </form>
             </div>
         </div>
     );
+};
+
+const SellerDashboardPage = () => {
+  const { user, reviews, listings, replyToReview, archiveReview, reportReview, markAsSold, deleteListing } = useApp();
+  if (!user) return null;
+  return (
+    <SellerDashboard 
+      user={user} 
+      reviews={reviews} 
+      listings={listings}
+      onReply={replyToReview}
+      onArchive={archiveReview}
+      onReport={reportReview}
+      onMarkAsSold={markAsSold}
+      onDeleteListing={deleteListing}
+    />
+  );
 };
 
 const MessagesListPage = () => {
@@ -1669,6 +2067,7 @@ export default function App() {
                         <Route path="/listing/:id" element={<ListingDetail />} />
                         <Route path="/chat/:id" element={<ChatPage />} />
                         <Route path="/messages" element={<MessagesListPage />} />
+                        <Route path="/dashboard" element={<SellerDashboardPage />} />
                       </Routes>
                     </main>
                     <RightPanel />
@@ -1686,16 +2085,7 @@ export default function App() {
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useApp();
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-bg-light">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mb-4"></div>
-          <p className="text-text-muted">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 };

@@ -1,105 +1,170 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // -------------------------------------------------------------------------
-    // 0. Catch-all: Default Deny
-    // -------------------------------------------------------------------------
+    
+    // --- 0. Global Safety Net ---
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // -------------------------------------------------------------------------
-    // 1. Primitive Helpers
-    // -------------------------------------------------------------------------
-    function isSignedIn() { return request.auth != null; }
-    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
-    function incoming() { return request.resource.data; }
-    function existing() { return resource.data; }
-    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
-    
-    // User Verification logic
-    function isVerifiedSeller() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isVerified == true;
+    // --- 1. Global Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // -------------------------------------------------------------------------
-    // 2. Validation Blueprints
-    // -------------------------------------------------------------------------
-    
-    function isValidUser(data) {
-      return data.keys().hasAll(['fullName', 'email', 'role', 'isVerified', 'createdAt'])
-        && data.fullName is string && data.fullName.size() <= 100
-        && data.email is string && data.email.size() <= 100
-        && data.role in ['buyer', 'seller']
-        && data.isVerified is bool
-        && data.createdAt is int;
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- 2. Validation Blueprints ---
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['fullName', 'email', 'role', 'isVerified', 'createdAt']) &&
+             data.fullName is string && data.fullName.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.role in ['buyer', 'seller', 'admin'] &&
+             data.isVerified is bool &&
+             data.createdAt is timestamp;
+    }
+
+    function isVerifiedSeller() {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'seller' &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isVerified == true &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verificationStatus == 'approved';
     }
 
     function isValidListing(data) {
-      return data.keys().hasAll(['title', 'price', 'category', 'sellerId', 'status', 'createdAt'])
-        && data.title is string && data.title.size() <= 150
-        && data.price is number && data.price >= 0
-        && data.category in ['Gadgets', 'Books', 'Uniforms', 'Services', 'Others']
-        && data.sellerId == request.auth.uid
-        && data.status in ['active', 'sold', 'archived']
-        && data.createdAt == request.time;
+      return data.keys().hasAll(['title', 'price', 'category', 'sellerId', 'status', 'condition', 'quantity', 'location', 'contactMethod', 'createdAt']) &&
+             data.title is string && data.title.size() <= 150 &&
+             data.price is number && data.price >= 0 &&
+             data.category is string &&
+             data.sellerId == request.auth.uid &&
+             data.status in ['active', 'sold', 'archived'] &&
+             data.condition in ['New', 'Used'] &&
+             data.quantity is number && data.quantity >= 0 &&
+             data.location is string && data.location.size() <= 200 &&
+             data.contactMethod is string &&
+             data.createdAt == (resource == null ? request.time : existing().createdAt);
+    }
+
+    function isValidChat(data) {
+      return data.participants is list && 
+             data.participants.size() == 2 &&
+             request.auth.uid in data.participants;
     }
 
     function isValidMessage(data) {
-      return data.keys().hasAll(['senderId', 'text', 'createdAt'])
-        && data.senderId == request.auth.uid
-        && data.text is string && data.text.size() <= 2000
-        && data.createdAt == request.time;
+      return data.senderId == request.auth.uid &&
+             data.text is string && data.text.size() <= 1000 &&
+             data.createdAt == request.time;
     }
 
-    // -------------------------------------------------------------------------
-    // 3. Collection Rules
-    // -------------------------------------------------------------------------
+    function isValidReview(data) {
+      return data.keys().hasAll(['customerId', 'customerName', 'listingId', 'sellerId', 'rating', 'status', 'createdAt']) &&
+             data.customerId == request.auth.uid &&
+             data.customerName is string &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             data.status == 'pending' &&
+             data.createdAt is timestamp;
+    }
 
-    // --- Users ---
+    function isValidSellerApplication(data) {
+      return data.keys().hasAll(['userId', 'fullName', 'school', 'status', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.fullName is string &&
+             data.school is string &&
+             data.status == 'pending' &&
+             data.createdAt is timestamp;
+    }
+
+    // --- 3. Collection Rules ---
+
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().isVerified == false;
-      allow update: if isOwner(userId) && isValidUser(incoming()) && (
-        // Only allow updating course or profile info, NOT verification status
-        incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'courseAndYear', 'studentId', 'verificationStatus', 'studentIdImage'])
-      );
+      allow get: if isSignedIn();
+      allow list: if false; // No bulk user scanning
+      
+      allow create: if isOwner(userId) && 
+                      isValidUserProfile(incoming()) && 
+                      incoming().isVerified == false && // Cannot self-verify
+                      incoming().role == 'buyer';      // Default role
+      
+      allow update: if isOwner(userId) && 
+                      isValidUserProfile(incoming()) &&
+                      incoming().isVerified == existing().isVerified && // Immutable verification
+                      incoming().role == existing().role &&             // Immutable role
+                      incoming().email == existing().email &&           // Immutable email
+                      incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'courseAndYear', 'studentId', 'universityEmail', 'bio', 'studentIdImage', 'verificationStatus']);
     }
 
-    // --- Listings ---
+    match /users/{userId}/favorites/{listingId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /sellerApplications/{userId} {
+      allow get: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidSellerApplication(incoming());
+    }
+
     match /listings/{listingId} {
-      // Secure List Query: Require status filter for public listings
-      allow list: if isSignedIn() && resource.data.status == 'active';
-      allow get: if isSignedIn();
-      
-      allow create: if isSignedIn() && isValidListing(incoming()) && isVerifiedSeller() && isValidId(listingId);
-      
-      allow update: if isOwner(existing().sellerId) && isValidListing(incoming()) && (
-        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'price', 'description', 'category', 'status', 'images', 'tags'])
-      );
-      
+      allow read: if isSignedIn();
+      allow create: if isVerifiedSeller() && isValidId(listingId) && isValidListing(incoming());
+      allow update: if isOwner(existing().sellerId) && 
+                      isValidListing(incoming()) &&
+                      incoming().sellerId == existing().sellerId &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'price', 'description', 'category', 'images', 'status', 'tags', 'condition', 'quantity', 'location', 'contactMethod', 'updatedAt', 'views', 'inquiries']);
       allow delete: if isOwner(existing().sellerId);
     }
 
-    // --- Chats ---
-    match /chats/{chatId} {
-      // Secure List Query: Require participant filter
-      allow list: if isSignedIn() && request.auth.uid in resource.data.participants;
-      allow get: if isSignedIn() && request.auth.uid in resource.data.participants;
+    match /reviews/{reviewId} {
+      // Public can read approved reviews for any listing
+      allow read: if isSignedIn() && (
+        existing().status == 'approved' || 
+        isOwner(existing().customerId) || 
+        isOwner(existing().sellerId)
+      );
       
-      allow create: if isSignedIn() && incoming().participants.size() == 2 
-        && request.auth.uid in incoming().participants
-        && isValidId(chatId);
-      
-      allow update: if isSignedIn() && request.auth.uid in existing().participants
-        && incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageAt']);
+      // Bulk listing of approved reviews (e.g. for a product page)
+      allow list: if isSignedIn() && resource.data.status == 'approved';
 
-      // --- Messages ---
+      allow create: if isSignedIn() && isValidReview(incoming());
+      
+      allow update: if isSignedIn() && (
+        // Seller can reply or archive
+        (isOwner(existing().sellerId) && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['sellerReply', 'status'])) ||
+        // Admin can approve/reject (not implemented here, but rules allow for future admin logic)
+        (false) 
+      );
+    }
+
+    match /chats/{chatId} {
+      allow read: if isSignedIn() && request.auth.uid in existing().participants;
+      allow create: if isEmailVerified() && isValidId(chatId) && isValidChat(incoming());
+      allow update: if isSignedIn() && request.auth.uid in existing().participants &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageAt']);
+      
       match /messages/{messageId} {
-        allow list: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-        allow get: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-        allow create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants 
-          && isValidMessage(incoming());
+        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow create: if isEmailVerified() && isValidId(messageId) && isValidMessage(incoming()) &&
+                      request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
       }
     }
   }

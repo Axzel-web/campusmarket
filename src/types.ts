@@ -13,7 +13,7 @@ export interface UserProfile {
   role: UserRole;
   isVerified: boolean;
   verificationStatus: 'none' | 'pending' | 'approved' | 'rejected';
-  createdAt: number;
+  createdAt: any; // Timestamp or number
 }
 
 export interface Listing {
@@ -26,24 +26,30 @@ export interface Listing {
   sellerId: string;
   sellerName: string;
   sellerRating?: number;
-  status: 'active' | 'sold' | 'deleted';
+  status: 'active' | 'sold' | 'archived';
   tags: string[];
-  createdAt: number;
+  condition: 'New' | 'Used';
+  quantity: number;
+  location: string;
+  contactMethod: string;
+  views: number;
+  inquiries: number;
+  createdAt: any; // Timestamp or number
+  updatedAt?: any;
 }
 
 export interface ChatMessage {
   id: string;
-  chatId: string;
   senderId: string;
   text: string;
-  createdAt: number;
+  createdAt: any; // Timestamp or number
 }
 
 export interface Chat {
   id: string;
   participants: string[];
   lastMessage?: string;
-  lastMessageAt?: number;
+  lastMessageAt?: any; // Timestamp or number
   listingId: string;
   listingTitle: string;
 }
@@ -51,4 +57,29 @@ export interface Chat {
 export interface Favorite {
   userId: string;
   listingId: string;
+}
+
+export interface Review {
+  id: string;
+  customerId: string;
+  customerName: string;
+  listingId: string;
+  listingTitle?: string;
+  sellerId: string;
+  rating: number;
+  message: string;
+  status: 'pending' | 'approved' | 'rejected' | 'archived';
+  sellerReply?: string;
+  approvedAt?: any;
+  createdAt: any;
+}
+
+export interface SellerApplication {
+  userId: string;
+  fullName: string;
+  school: string;
+  contactLink: string;
+  photoURL: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: any;
 }
