@@ -658,16 +658,6 @@ const HomePage = () => {
   );
 };
 
-const themes = [
-  { background: "#1A1A2E", color: "#FFFFFF", primaryColor: "#0F3460" },
-  { background: "#461220", color: "#FFFFFF", primaryColor: "#E94560" },
-  { background: "#192A51", color: "#FFFFFF", primaryColor: "#967AA1" },
-  { background: "#F7B267", color: "#000000", primaryColor: "#F4845F" },
-  { background: "#F25F5C", color: "#000000", primaryColor: "#642B36" },
-  { background: "#231F20", color: "#FFFFFF", primaryColor: "#BB4430" },
-  { background: "#FAFDFB", color: "#064e3b", primaryColor: "#10b981" } // Added Mint Theme
-];
-
 const LoginPage = () => {
   const { login, user } = useApp();
   const [loggingIn, setLoggingIn] = useState(false);
@@ -675,7 +665,6 @@ const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [theme, setTheme] = useState(themes[6]); // Default to Mint
 
   if (user) return <Navigate to="/market" replace />;
 
@@ -706,47 +695,30 @@ const LoginPage = () => {
     }
   };
 
-  const isDarkTheme = theme.color === '#FFFFFF';
+  const themeBackground = "#f3f4f6";
+  const themePrimaryColor = "#00D285";
+  const themeColor = "#000000";
+  const isDarkTheme = false;
 
   return (
     <div 
       className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 relative overflow-hidden transition-colors duration-500 font-sans"
-      style={{ backgroundColor: theme.background, color: theme.color }}
+      style={{ backgroundColor: themeBackground, color: themeColor }}
     >
-      {/* Dynamic Background Circles - Soft Ambient Glow */}
-      <div 
-        className="absolute w-48 h-48 md:w-72 md:h-72 rounded-full opacity-40 blur-[80px] top-0 left-0 animate-pulse transition-all duration-1000"
-        style={{ backgroundColor: theme.primaryColor, transform: 'translate(-20%, -20%)' }}
-      ></div>
-      <div 
-        className="absolute w-64 h-64 md:w-96 md:h-96 rounded-full opacity-20 blur-[100px] bottom-0 right-0 transition-all duration-1000"
-        style={{ backgroundColor: theme.primaryColor, transform: 'translate(20%, 20%)' }}
-      ></div>
-
       <div className="relative w-full max-w-[420px] z-10 py-8">
-        {/* Floating Accent Circles - Responsive Position */}
-        <div 
-          className="absolute -top-12 -left-12 w-24 h-24 md:w-32 md:h-32 rounded-full z-[-1] hidden sm:block transition-all duration-700 shadow-2xl"
-          style={{ backgroundColor: theme.primaryColor, opacity: 0.8 }}
-        ></div>
-        <div 
-          className="absolute -bottom-12 -right-12 w-24 h-24 md:w-32 md:h-32 rounded-full z-[-1] hidden sm:block transition-all duration-700 shadow-2xl"
-          style={{ backgroundColor: theme.primaryColor, opacity: 0.8 }}
-        ></div>
-
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="relative backdrop-blur-2xl border rounded-[2rem] p-5 sm:p-7 md:p-8 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] overflow-hidden"
           style={{ 
-            backgroundColor: isDarkTheme ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-            borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+            backgroundColor: 'rgba(0, 0, 0, 0.05)',
+            borderColor: 'rgba(0, 0, 0, 0.1)'
           }}
         >
           {/* Header Section - More Compact */}
           <div className="flex flex-col items-center mb-4 sm:mb-6">
-            <Link to="/" className="absolute top-4 left-4 p-2 bg-white/20 rounded-full hover:bg-white/40 transition-all">
+            <Link to="/" className="absolute top-4 left-4 p-2 bg-black/5 rounded-full hover:bg-black/10 transition-all text-black">
               <ArrowLeft size={18} />
             </Link>
             <div className="w-full max-w-[120px] sm:max-w-[150px] mb-3">
@@ -756,7 +728,7 @@ const LoginPage = () => {
                 className="w-full h-auto drop-shadow-xl animate-float"
               />
             </div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-center tracking-[0.15em] opacity-80 uppercase leading-none">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-center tracking-[0.15em] uppercase leading-none" style={{ color: themeColor }}>
               {mode === 'signup' ? 'Sign Up' : 'Sign In'}
             </h1>
           </div>
@@ -766,10 +738,14 @@ const LoginPage = () => {
               type="button"
               onClick={handleGoogleLogin}
               disabled={loggingIn}
-              className="w-full py-3.5 rounded-xl border-2 border-current border-opacity-20 flex items-center justify-center gap-3 hover:bg-current hover:bg-opacity-10 transition-all text-xs font-black tracking-[2px] disabled:opacity-50 uppercase mb-4 shadow-xl"
-              style={{ borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0,0,0,0.1)' }}
+              className="w-full py-3.5 rounded-xl border-2 flex items-center justify-center gap-3 hover:brightness-95 transition-all text-xs font-black tracking-[2px] disabled:opacity-50 uppercase mb-4 shadow-lg"
+              style={{ 
+                backgroundColor: '#FFFFFF',
+                color: '#000000',
+                borderColor: '#000000'
+              }}
             >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 shadow-sm" />
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
               Sign in with Google
             </button>
 
@@ -786,11 +762,11 @@ const LoginPage = () => {
                 placeholder="UNIVERSITY EMAIL"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full py-3 sm:py-3.5 px-4 rounded-xl outline-none text-[11px] sm:text-xs font-bold tracking-widest placeholder:text-inherit placeholder:opacity-40 backdrop-blur-md transition-all border"
+                className="w-full py-3 sm:py-3.5 px-4 rounded-xl outline-none text-[11px] sm:text-xs font-bold tracking-widest placeholder:text-black placeholder:opacity-50 backdrop-blur-md transition-all border shadow-sm focus:border-black focus:bg-white/40"
                 style={{ 
-                  color: theme.color,
-                  backgroundColor: isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                  borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                  color: themeColor,
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  borderColor: 'rgba(0, 0, 0, 0.1)'
                 }}
               />
             </div>
@@ -801,11 +777,11 @@ const LoginPage = () => {
                 placeholder="PASSWORD"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full py-3 sm:py-3.5 px-4 rounded-xl outline-none text-[11px] sm:text-xs font-bold tracking-widest placeholder:text-inherit placeholder:opacity-40 backdrop-blur-md transition-all border"
+                className="w-full py-3 sm:py-3.5 px-4 rounded-xl outline-none text-[11px] sm:text-xs font-bold tracking-widest placeholder:text-black placeholder:opacity-50 backdrop-blur-md transition-all border shadow-sm focus:border-black focus:bg-white/40"
                 style={{ 
-                  color: theme.color,
-                  backgroundColor: isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                  borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                  color: themeColor,
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  borderColor: 'rgba(0, 0, 0, 0.1)'
                 }}
               />
             </div>
@@ -815,7 +791,7 @@ const LoginPage = () => {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 className="text-[9px] font-black text-center uppercase tracking-wider" 
-                style={{ color: theme.color === '#000000' ? '#C62828' : '#FFAB91' }}
+                style={{ color: '#C62828' }}
               >
                 {error}
               </motion.p>
@@ -824,8 +800,8 @@ const LoginPage = () => {
             <button 
               type="submit"
               disabled={loggingIn}
-              className="w-full py-3.5 rounded-xl text-xs sm:text-sm font-black tracking-[2px] transition-all duration-300 hover:brightness-110 active:scale-95 shadow-lg disabled:opacity-50 mt-1"
-              style={{ backgroundColor: theme.primaryColor, color: theme.color === '#FFFFFF' ? '#FFFFFF' : '#000000' }}
+              className="w-full py-3.5 rounded-xl text-xs sm:text-sm font-black tracking-[2px] transition-all duration-300 hover:brightness-110 active:scale-95 shadow-lg disabled:opacity-50 mt-1 border-2 border-black"
+              style={{ backgroundColor: themePrimaryColor, color: '#000000' }}
             >
               {loggingIn ? (
                 <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -836,7 +812,7 @@ const LoginPage = () => {
           </form>
 
           <footer className="mt-4 flex flex-col items-center">
-            <div className="flex justify-between w-full text-[8px] sm:text-[9px] font-bold tracking-widest opacity-50 px-1">
+            <div className="flex justify-between w-full text-[8px] sm:text-[9px] font-bold tracking-widest px-1" style={{ color: themeColor, opacity: 0.7 }}>
               <button 
                 onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
                 className="hover:opacity-100 transition-opacity uppercase underline underline-offset-4"
@@ -849,18 +825,6 @@ const LoginPage = () => {
         </motion.div>
       </div>
 
-      {/* Responsive Theme Panel */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 sm:left-10 sm:translate-x-0 flex gap-2.5 p-2 bg-white bg-opacity-10 backdrop-blur-2xl rounded-2xl border border-white border-opacity-10 z-20 shadow-xl overflow-x-auto no-scrollbar max-w-[90vw]">
-        {themes.map((t, idx) => (
-          <button
-            key={idx}
-            onClick={() => setTheme(t)}
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl border-2 border-white border-opacity-30 hover:scale-110 active:scale-90 transition-all flex-shrink-0"
-            style={{ backgroundColor: t.background }}
-          />
-        ))}
-      </div>
-      
       <div className="fixed top-8 left-8 sm:left-auto sm:right-10 text-[9px] font-black tracking-[4px] opacity-30 uppercase">
         <span className="hidden sm:inline">Plsp University • Marketplace • </span> 2026 
       </div>
