@@ -15,31 +15,6 @@ export const LandingPage: React.FC = () => {
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
 
-    // --- Mock DrawSVG since it's a paid plugin ---
-    const initSVG = (selector: string) => {
-      const paths = document.querySelectorAll(selector);
-      paths.forEach((path: any) => {
-        if (path.getTotalLength) {
-          const length = path.getTotalLength();
-          path.style.strokeDasharray = length;
-          path.style.strokeDashoffset = length;
-        }
-      });
-    };
-
-    const animateSVG = (selector: string, progress: number) => {
-      const paths = document.querySelectorAll(selector);
-      paths.forEach((path: any) => {
-        if (path.getTotalLength) {
-          const length = path.getTotalLength();
-          gsap.to(path, {
-            strokeDashoffset: length * (1 - progress / 100),
-            overwrite: true
-          });
-        }
-      });
-    };
-
     // --- Scene Setup ---
     class Scene {
       views: any[];
@@ -161,8 +136,13 @@ export const LandingPage: React.FC = () => {
           const view = this.views[ii];
           const camera = view.camera;
           camera.aspect = this.w / this.h;
-          let camZ = (window.screen.width - (this.w * 1)) / 3;
-          camera.position.z = camZ < 180 ? 180 : camZ;
+          
+          // Better mobile scaling: pull camera back further on narrow screens
+          let camZ = 180;
+          if (this.w < 800) {
+            camZ = 180 + (800 - this.w) * 0.5;
+          }
+          camera.position.z = Math.max(180, camZ);
           camera.updateProjectionMatrix();
         }
 
@@ -191,19 +171,10 @@ export const LandingPage: React.FC = () => {
       gsap.fromTo(activeScene.renderer.domElement, { x: "50%", autoAlpha: 0 }, { duration: 1, x: "0%", autoAlpha: 1 });
       gsap.to('.scroll-cta', { opacity: 1, duration: 1 });
 
-      // Toggle SVG visibility based on section - this fixes the overlapping lines in "Fin"
-      ScrollTrigger.create({
-        trigger: ".blueprint",
-        start: "top bottom",
-        end: "bottom top",
-        onToggle: self => {
-          gsap.to('.blueprint svg', { autoAlpha: self.isActive ? 1 : 0, duration: 0.3 });
-        }
-      });
-
-      // SVG Animations setup
+      // Airplane animations setup
+      const initialX = window.innerWidth < 800 ? 0 : 80;
       gsap.set(plane.rotation, { y: tau * -.25 });
-      gsap.set(plane.position, { x: 80, y: -32, z: -60 });
+      gsap.set(plane.position, { x: initialX, y: -32, z: -60 });
 
       activeScene.render();
 
@@ -257,31 +228,6 @@ export const LandingPage: React.FC = () => {
           start: "top bottom",
           end: "bottom top"
         }
-      });
-
-      // SVG Animations
-      ScrollTrigger.create({
-        trigger: ".length",
-        scrub: true,
-        start: "top bottom",
-        end: "top top",
-        onUpdate: (self) => animateSVG('#line-length', self.progress * 100)
-      });
-
-      ScrollTrigger.create({
-        trigger: ".wingspan",
-        scrub: true,
-        start: "top 25%",
-        end: "bottom 50%",
-        onUpdate: (self) => animateSVG('#line-wingspan', self.progress * 100)
-      });
-
-      ScrollTrigger.create({
-        trigger: ".phalange",
-        scrub: true,
-        start: "top 50%",
-        end: "bottom 100%",
-        onUpdate: (self) => animateSVG('#circle-phalange', self.progress * 100)
       });
 
       // Core Timeline
@@ -340,10 +286,6 @@ export const LandingPage: React.FC = () => {
     };
 
     const loadModel = () => {
-      initSVG('#line-length');
-      initSVG('#line-wingspan');
-      initSVG('#circle-phalange');
-      
       const loader = new OBJLoader();
       
       loader.load(
@@ -384,7 +326,8 @@ export const LandingPage: React.FC = () => {
         .landing-page-wrapper {
           --padding: 10vmin;
           --color-background: #D0CBC7;
-          --color-mint: #98FFBD;
+          --color-text: black;
+          --color-text-light: white;
           --font-size-large: 8vw;
           --font-size-medium: 4vw;
           --font-size-normal: 2vw;
@@ -396,7 +339,7 @@ export const LandingPage: React.FC = () => {
           font-weight: 400;
           font-size: var(--font-size-normal);
           overflow-x: hidden;
-          color: white; /* Keep text white/mint */
+          color: var(--color-text);
           position: relative;
           line-height: 1.5;
         }
@@ -417,7 +360,7 @@ export const LandingPage: React.FC = () => {
           }
         }
 
-        .landing-page-wrapper a { color: var(--color-mint); }
+        .landing-page-wrapper a { color: black; font-weight: 700; }
         .landing-page-wrapper ul { margin: 0; padding: 0; list-style: none; }
         .landing-page-wrapper li { margin-top: 10px; }
 
@@ -439,7 +382,15 @@ export const LandingPage: React.FC = () => {
           justify-content: center;
         }
 
-        .landing-content .section.dark { color: var(--color-mint); background-color: black; }
+        @media only screen and (max-width: 600px) {
+          .landing-content .section {
+            padding: 2rem;
+            width: calc(100vw - 4rem);
+            height: calc(100vh - 4rem);
+          }
+        }
+
+        .landing-content .section.dark { color: white; background-color: black; }
         .landing-content .section.right { text-align: right; align-items: flex-end; }
 
         .blueprint {
@@ -452,18 +403,6 @@ export const LandingPage: React.FC = () => {
           background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
           background-position: -2px -2px, -2px -2px, -1px -1px, -1px -1px;
           background-attachment: fixed;
-        }
-
-        .blueprint svg {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100vw;
-          height: 100vh;
-          stroke: white;
-          pointer-events: none;
-          visibility: hidden;
-          z-index: 100;
         }
 
         .blueprint .dark { background-color: transparent; }
@@ -490,7 +429,7 @@ export const LandingPage: React.FC = () => {
         .clouds { z-index: 2; background-image: url("https://assets.codepen.io/557388/clouds.png"); }
 
         .scroll-cta, .credits { position: absolute; bottom: var(--padding); }
-        .scroll-cta { font-size: var(--font-size-medium); opacity: 0; color: white; }
+        .scroll-cta { font-size: var(--font-size-medium); opacity: 0; color: black; }
 
         .sunset {
           background: url("https://assets.codepen.io/557388/sunset-reduced.jpg") no-repeat top center;
@@ -504,18 +443,18 @@ export const LandingPage: React.FC = () => {
           font-weight: 700;
           display: inline;
           line-height: 1.1;
-          color: white;
+          color: inherit;
         }
 
         .landing-page-wrapper h3 {
           font-size: var(--font-size-medium);
           font-weight: 400;
           margin: 0;
-          color: var(--color-mint);
+          opacity: 0.7;
         }
 
         .landing-page-wrapper p {
-           color: white;
+           color: inherit;
         }
 
         .end h2 { margin-bottom: 50vh; }
@@ -526,7 +465,7 @@ export const LandingPage: React.FC = () => {
           top: var(--padding);
           right: var(--padding);
           background: white;
-          color: var(--color-mint) !important;
+          color: black !important;
           padding: 1rem 2rem;
           border-radius: 9999px;
           font-weight: 700;
@@ -537,15 +476,24 @@ export const LandingPage: React.FC = () => {
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          border: 1px solid var(--color-mint);
+          border: 1px solid black;
           font-family: 'Inter', sans-serif;
           letter-spacing: 0.05em;
           text-transform: uppercase;
           font-size: 14px;
         }
+
+        @media only screen and (max-width: 600px) {
+          .login-btn-landing {
+            padding: 0.6rem 1.2rem;
+            font-size: 11px;
+            top: 1.5rem;
+            right: 1.5rem;
+          }
+        }
         .login-btn-landing:hover {
           transform: translateY(-2px);
-          background: var(--color-mint);
+          background: black;
           color: white !important;
         }
         
@@ -559,7 +507,7 @@ export const LandingPage: React.FC = () => {
           Marketplace <span className="opacity-50">/</span> Access
         </Link>
 
-        {/* --- Airplane Section Content --- */}
+        {/* --- Marketplace Section Content --- */}
         <div className="trigger"></div>
         <div className="section">
           <h1>Marketplace.</h1>
@@ -592,11 +540,6 @@ export const LandingPage: React.FC = () => {
         </div>
 
         <div className="blueprint">
-          <svg width="100%" height="100%" viewBox="0 0 100 100">
-            <line id="line-length" x1="10" y1="80" x2="90" y2="80" strokeWidth="0.5"></line>
-            <path id="line-wingspan" d="M10 50, L40 35, M60 35 L90 50" strokeWidth="0.5"></path>
-            <circle id="circle-phalange" cx="60" cy="60" r="15" fill="transparent" strokeWidth="0.5"></circle>
-          </svg>
           <div className="section dark ">
             <h2>Stats and Savings.</h2>
             <p>The marketplace by the numbers...</p>
