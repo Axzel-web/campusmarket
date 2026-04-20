@@ -38,6 +38,7 @@ import { cn, compressImage } from './lib/utils';
 import { generateListingDetails } from './services/geminiService';
 import { LandingPage } from './components/LandingPage';
 import { SellerDashboard } from './components/SellerDashboard';
+import { LoadingAnimation } from './components/LoadingAnimation';
 import { supabase } from './lib/supabase';
 import { uploadProductImage } from './services/productService';
 
@@ -167,7 +168,7 @@ const Navbar = () => {
       <div className="max-w-[1280px] mx-auto h-full flex items-center px-4 md:px-6 justify-between">
         <div className="flex items-center gap-4 md:gap-8 flex-1">
           {!showSearch && (
-            <Link to="/" className="text-xl md:text-2xl font-extrabold text-brand-primary tracking-tight whitespace-nowrap">CampusMarket</Link>
+            <Link to="/market" className="text-xl md:text-2xl font-extrabold text-brand-primary tracking-tight whitespace-nowrap">CampusMarket</Link>
           )}
           
           <div className={cn(
@@ -215,10 +216,10 @@ const Sidebar = () => {
   const { user } = useApp();
   
   const navItems = [
-    { icon: Home, label: 'Home Feed', path: '/' },
+    { icon: ShoppingBag, label: 'Home Feed', path: '/market' },
     { icon: Filter, label: 'Categories', path: '/categories' },
     { icon: Heart, label: 'Favorites', path: '/favorites' },
-    { icon: ShoppingBag, label: 'My Orders', path: '/purchases' },
+    { icon: Archive, label: 'My Orders', path: '/purchases' },
     { icon: MessageSquare, label: 'Messages', path: '/messages' },
     ...(user?.role === 'seller' ? [{ icon: BarChart3, label: 'Reviews', path: '/dashboard' }] : []),
     { icon: User, label: 'Profile', path: '/profile' },
@@ -415,7 +416,6 @@ const ListingCard = ({ listing }: { listing: Listing }) => {
 const MobileTabs = () => {
   const location = useLocation();
   const navItems = [
-    { icon: Home, path: '/' },
     { icon: ShoppingBag, path: '/market' },
     { icon: PlusCircle, path: '/sell' },
     { icon: MessageSquare, path: '/messages' },
@@ -2280,52 +2280,81 @@ const NotificationOverlay = () => {
     );
 };
 
+const AppContent = () => {
+  const { loading } = useApp();
+
+  return (
+    <AnimatePresence mode="wait">
+      {loading ? (
+        <motion.div
+          key="loader"
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <LoadingAnimation />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="content"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="min-h-screen"
+        >
+          <Router>
+            <NotificationOverlay />
+            <AnimatePresence mode="wait">
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/*" element={
+                  <ProtectedRoute>
+                    <div className="min-h-screen bg-bg-light font-sans pt-16">
+                      <Navbar />
+                      <div className="flex max-w-[1280px] mx-auto min-h-[calc(100vh-64px)]">
+                        <Sidebar />
+                        <main className="flex-1 flex flex-col pb-20 md:pb-0 overflow-y-auto">
+                          <Routes>
+                            <Route path="/" element={<Navigate to="/market" replace />} />
+                            <Route path="/market" element={<HomePage />} />
+                            <Route path="/categories" element={<CategoriesPage />} />
+                            <Route path="/favorites" element={<FavoritesPage />} />
+                            <Route path="/sell" element={<SellPage />} />
+                            <Route path="/profile" element={<ProfilePage />} />
+                            <Route path="/verify" element={<VerificationPage />} />
+                            <Route path="/listing/:id" element={<ListingDetail />} />
+                            <Route path="/chat/:id" element={<ChatPage />} />
+                            <Route path="/messages" element={<MessagesListPage />} />
+                            <Route path="/dashboard" element={<SellerDashboardPage />} />
+                          </Routes>
+                        </main>
+                        <RightPanel />
+                      </div>
+                      <MobileTabs />
+                    </div>
+                  </ProtectedRoute>
+                } />
+              </Routes>
+            </AnimatePresence>
+          </Router>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 export default function App() {
   return (
     <AppProvider>
-      <Router>
-        <NotificationOverlay />
-        <AnimatePresence mode="wait">
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/*" element={
-              <ProtectedRoute>
-                <div className="min-h-screen bg-bg-light font-sans pt-16">
-                  <Navbar />
-                  <div className="flex max-w-[1280px] mx-auto min-h-[calc(100vh-64px)]">
-                    <Sidebar />
-                    <main className="flex-1 flex flex-col pb-20 md:pb-0 overflow-y-auto">
-                      <Routes>
-                        <Route path="/" element={<Navigate to="/market" replace />} />
-                        <Route path="/market" element={<HomePage />} />
-                        <Route path="/categories" element={<CategoriesPage />} />
-                        <Route path="/favorites" element={<FavoritesPage />} />
-                        <Route path="/sell" element={<SellPage />} />
-                        <Route path="/profile" element={<ProfilePage />} />
-                        <Route path="/verify" element={<VerificationPage />} />
-                        <Route path="/listing/:id" element={<ListingDetail />} />
-                        <Route path="/chat/:id" element={<ChatPage />} />
-                        <Route path="/messages" element={<MessagesListPage />} />
-                        <Route path="/dashboard" element={<SellerDashboardPage />} />
-                      </Routes>
-                    </main>
-                    <RightPanel />
-                  </div>
-                  <MobileTabs />
-                </div>
-              </ProtectedRoute>
-            } />
-          </Routes>
-        </AnimatePresence>
-      </Router>
+      <AppContent />
     </AppProvider>
   );
 }
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useApp();
-  if (loading) return null;
+  if (loading) return <LoadingAnimation />;
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 };
