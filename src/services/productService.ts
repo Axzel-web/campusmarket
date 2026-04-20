@@ -147,6 +147,9 @@ export const uploadProductImage = async (file: File | Blob, userId: string): Pro
     });
 
   if (uploadError) {
+    if (uploadError.message.toLowerCase().includes('bucket not found')) {
+      throw new Error('Supabase Storage: Please create a bucket named "listings" in your Supabase project (Storage -> New Bucket) to enable image uploads.');
+    }
     console.error('Supabase Storage Upload Error:', uploadError);
     throw uploadError;
   }

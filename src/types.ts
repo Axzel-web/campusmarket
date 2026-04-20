@@ -10,6 +10,7 @@ export interface UserProfile {
   universityEmail?: string;
   bio?: string;
   contactDetails?: string;
+  avatarUrl?: string;
   role: UserRole;
   isVerified: boolean;
   verificationStatus: 'none' | 'pending' | 'approved' | 'rejected';

@@ -15,6 +15,7 @@
         "isVerified": { "type": "boolean" },
         "verificationStatus": { "type": "string", "enum": ["none", "pending", "approved", "rejected"] },
         "studentIdImage": { "type": "string" },
+        "avatarUrl": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["fullName", "email", "role", "isVerified", "createdAt"]

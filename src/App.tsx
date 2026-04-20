@@ -36,6 +36,7 @@ import {
 import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication } from './types';
 import { cn, compressImage } from './lib/utils';
 import { generateListingDetails } from './services/geminiService';
+import { uploadAvatar } from './services/userService';
 import { LandingPage } from './components/LandingPage';
 import { SellerDashboard } from './components/SellerDashboard';
 import { LoadingAnimation } from './components/LoadingAnimation';
@@ -202,8 +203,12 @@ const Navbar = () => {
             <Heart size={20} />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-primary rounded-full"></span>
           </Link>
-          <Link to="/profile" className="w-8 h-8 rounded-full bg-accent-subtle border border-border-main flex items-center justify-center font-semibold text-brand-primary text-sm uppercase">
-            {user.fullName[0]}
+          <Link to="/profile" className="w-8 h-8 rounded-full bg-accent-subtle border border-border-main flex items-center justify-center font-semibold text-brand-primary text-sm uppercase overflow-hidden">
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.fullName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              user.fullName[0]
+            )}
           </Link>
         </div>
       </div>
@@ -872,139 +877,223 @@ const LoginPage = () => {
 };
 
 const ProfilePage = () => {
-  const { user, logout } = useApp();
+  const { user, logout, listings, updateProfile, addNotification } = useApp();
   const navigate = useNavigate();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   if (!user) return null;
 
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      addNotification("Updating your profile picture...", "info");
+      
+      const compressed = await compressImage(file);
+      const url = await uploadAvatar(compressed, user.id);
+      
+      await updateProfile({ avatarUrl: url });
+      addNotification("Profile picture updated successfully!", "success");
+    } catch (error: any) {
+      console.error("Avatar upload error:", error);
+      addNotification(error.message || "Failed to update profile picture", "error");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const userListingsCount = listings.filter(l => l.sellerId === user.id).length;
+
   return (
-    <div className="flex-1 px-6 py-6 overflow-y-auto no-scrollbar">
-      <div className="max-w-3xl mx-auto">
-        <div className="mb-8 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-text-main">Your Account</h1>
+    <div className="flex-1 px-4 py-8 overflow-y-auto no-scrollbar bg-[#f8fafc]">
+      <div className="max-w-3xl mx-auto space-y-6 pb-20">
+        {/* Header Section */}
+        <div className="flex items-end justify-between px-2">
+          <div>
+            <h1 className="text-3xl font-black text-text-main tracking-tight">Your Account</h1>
+            <p className="text-text-muted text-sm font-medium">Manage your campus activities</p>
+          </div>
           <button 
             onClick={logout} 
-            className="flex items-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 rounded-xl transition-all text-xs font-bold"
+            className="flex items-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 rounded-2xl transition-all text-xs font-bold border border-red-100 bg-white shadow-sm"
           >
             <LogOut size={16} /> Log Out
           </button>
         </div>
 
-        <div className="bg-white rounded-3xl p-8 border border-border-main mb-8 shadow-sm">
-          <div className="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
-            <div className="w-24 h-24 rounded-3xl bg-accent-subtle border-2 border-brand-primary flex items-center justify-center text-brand-primary text-4xl font-black">
-              {user.fullName[0]}
-            </div>
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold text-text-main mb-1">{user.fullName}</h2>
-              <p className="text-text-muted text-sm font-medium mb-1">{user.courseAndYear}</p>
-              {user.bio && <p className="text-text-main text-xs mb-3 italic">"{user.bio}"</p>}
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                {user.isVerified ? (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 text-[10px] font-bold rounded-full border border-green-200">
-                    <ShieldCheck size={12} /> VERIFIED CAMPUS SELLER
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-bg-light text-text-muted text-[10px] font-bold rounded-full border border-border-main">
-                    STUDENT BUYER ACCOUNT
-                  </span>
+        {/* Profile Card Magic */}
+        <div className="bg-white rounded-[32px] overflow-hidden border border-border-main shadow-sm relative">
+          <div className="h-24 bg-gradient-to-r from-brand-primary to-emerald-400 opacity-90"></div>
+          <div className="px-8 pb-8">
+            <div className="relative flex flex-col md:flex-row items-center md:items-end gap-6 -mt-12 mb-6">
+              <div 
+                className="w-28 h-28 rounded-3xl bg-white p-1 shadow-xl relative z-10 cursor-pointer group"
+                onClick={handleAvatarClick}
+              >
+                <div className="w-full h-full rounded-2xl bg-accent-subtle border-4 border-white flex items-center justify-center text-brand-primary text-4xl font-black transition-transform group-hover:scale-105 overflow-hidden">
+                  {uploading ? (
+                    <div className="w-8 h-8 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
+                  ) : user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt={user.fullName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    user.fullName[0]
+                  )}
+                  {/* Hover Overlay */}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                    <Camera size={24} />
+                  </div>
+                </div>
+                {user.isVerified && (
+                  <div className="absolute -bottom-1 -right-1 bg-brand-primary text-white p-1.5 rounded-full border-4 border-white shadow-lg z-20">
+                    <ShieldCheck size={14} fill="currentColor" />
+                  </div>
                 )}
-                <span className="px-3 py-1 bg-accent-subtle text-brand-primary text-[10px] font-bold rounded-full border border-brand-primary/10">
-                  SINCE {new Date(user.createdAt).getFullYear()}
-                </span>
+              </div>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                accept="image/*" 
+                className="hidden" 
+              />
+              <div className="flex-1 text-center md:text-left pb-2">
+                <h2 className="text-2xl font-black text-text-main leading-tight flex items-center justify-center md:justify-start gap-2">
+                  {user.fullName}
+                </h2>
+                <p className="text-text-muted text-sm font-bold flex items-center justify-center md:justify-start gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-primary"></span>
+                  {user.courseAndYear || 'Student Buyer'}
+                </p>
+              </div>
+              <div className="hidden md:block pb-2">
+                 <button className="px-5 py-2.5 bg-bg-light border border-border-main rounded-2xl text-xs font-bold text-text-main hover:bg-white transition-all shadow-sm">
+                   Edit Profile
+                 </button>
               </div>
             </div>
-          </div>
 
-          <div className="mt-8 pt-8 border-t border-border-main grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-xl font-bold text-text-main">0</p>
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Posts</p>
-            </div>
-            <div>
-               <p className="text-xl font-bold text-text-main">0</p>
-               <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Sold</p>
-            </div>
-            <div>
-               <p className="text-xl font-bold text-text-main">5.0</p>
-               <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Rating</p>
+            {user.bio && (
+              <div className="mb-8 p-4 bg-bg-light rounded-2xl border border-border-main text-sm text-text-main italic relative">
+                <Sparkles className="absolute -top-3 -right-3 text-brand-primary opacity-20" size={24} />
+                "{user.bio}"
+              </div>
+            )}
+
+            {/* Quick Stats Bento */}
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: 'Active Ads', value: userListingsCount, icon: ShoppingBag, color: 'text-blue-500', bg: 'bg-blue-50' },
+                { label: 'Sold Items', value: '0', icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                { label: 'Rating', value: '5.0', icon: Star, color: 'text-amber-500', bg: 'bg-amber-50' },
+              ].map((stat, i) => (
+                <div key={i} className="p-4 rounded-2xl border border-border-main bg-white hover:border-brand-primary transition-colors group cursor-default">
+                  <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center mb-2 mx-auto md:mx-0", stat.bg, stat.color)}>
+                    <stat.icon size={16} />
+                  </div>
+                  <p className="text-lg font-black text-text-main leading-tight md:text-left text-center">{stat.value}</p>
+                  <p className="text-[9px] font-bold text-text-muted uppercase tracking-wider md:text-left text-center">{stat.label}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Action Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          {!user.isVerified && user.verificationStatus === 'none' && (
+        {/* Action Bento Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Main Action - Verification */}
+          {!user.isVerified && user.verificationStatus === 'none' ? (
             <motion.div 
               whileHover={{ y: -4 }}
-              className="p-6 bg-brand-primary rounded-3xl text-white relative overflow-hidden shadow-xl shadow-brand-primary/20 cursor-pointer"
               onClick={() => navigate('/verify')}
+              className="p-6 bg-brand-primary rounded-[32px] text-white relative overflow-hidden shadow-xl shadow-brand-primary/20 cursor-pointer group"
             >
               <div className="relative z-10">
-                <h3 className="font-bold text-lg mb-1">Start Selling</h3>
-                <p className="text-white/80 text-xs mb-4 max-w-[180px]">Join 500+ student sellers on CampusMarket tonight.</p>
-                <div className="inline-flex items-center gap-2 px-5 py-2 bg-white text-brand-primary rounded-xl font-bold text-[11px] shadow-sm">
-                  Get Verified <ChevronRight size={14} />
+                <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[9px] font-black uppercase tracking-wider mb-3">Become a Seller</span>
+                <h3 className="font-black text-xl mb-1">Get Student Verified</h3>
+                <p className="text-white/80 text-xs mb-6 max-w-[200px] font-medium">Join 500+ active student sellers on CampusMarket tonight.</p>
+                <div className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-brand-primary rounded-xl font-black text-xs shadow-lg group-hover:scale-105 transition-transform">
+                  Start Application <ArrowLeft className="rotate-180" size={16} />
                 </div>
               </div>
-              <ShoppingBag className="absolute -bottom-6 -right-6 w-32 h-32 text-white/10 rotate-12" />
+              <ShieldCheck className="absolute -bottom-6 -right-6 w-40 h-40 text-black/10 -rotate-12 transition-transform group-hover:rotate-0 duration-700" />
             </motion.div>
-          )}
-
-          {user.verificationStatus === 'pending' && (
-             <div className="p-6 bg-amber-50 rounded-3xl border border-amber-200 text-amber-800">
-               <h3 className="font-bold text-lg mb-1">Verification Processing</h3>
-               <p className="text-xs opacity-80 mb-4">We're reviewing your Student ID. This typically takes 12-24 hours. Check back soon!</p>
-               <div className="flex items-center gap-2 text-[10px] font-black uppercase">
+          ) : user.verificationStatus === 'pending' ? (
+            <div className="p-6 bg-amber-50 rounded-[32px] border border-amber-200 text-amber-800">
+               <h3 className="font-black text-xl mb-1">Review in Progress</h3>
+               <p className="text-xs font-medium opacity-80 mb-6">We're verifying your ID. This typically takes 12-24 hours.</p>
+               <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 rounded-xl text-[10px] font-black uppercase border border-amber-200">
                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
                  Status: Under Review
                </div>
-             </div>
-          )}
-
-          {user.verificationStatus === 'rejected' && (
-             <div className="p-6 bg-red-50 rounded-3xl border border-red-200 text-red-800 cursor-pointer" onClick={() => navigate('/verify')}>
-               <h3 className="font-bold text-lg mb-1">Verification Rejected</h3>
-               <p className="text-xs opacity-80 mb-4">Your ID could not be verified. Tap here to try submitting again with a clearer photo.</p>
-               <div className="flex items-center gap-2 text-[10px] font-black uppercase">
-                 <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                 Status: Rejected
-               </div>
-             </div>
-          )}
-
-          <div className="p-6 bg-accent-subtle rounded-3xl border border-border-main flex flex-col justify-between">
-            <div>
-              <h3 className="font-bold text-lg text-brand-primary mb-1">Student Perks</h3>
-              <p className="text-text-muted text-xs">Unlock exclusive campus deals and group buying features.</p>
             </div>
-            <button className="mt-4 text-brand-primary text-xs font-bold flex items-center gap-1 hover:underline">
-              See All Perks <ChevronRight size={14} />
+          ) : (
+            <motion.div 
+              whileHover={{ y: -4 }}
+              className="p-6 bg-text-main rounded-[32px] text-white relative overflow-hidden shadow-xl shadow-black/10 cursor-pointer group"
+              onClick={() => navigate('/dashboard')}
+            >
+              <div className="relative z-10">
+                <h3 className="font-black text-xl mb-1">Seller Hub</h3>
+                <p className="text-white/60 text-xs mb-6">Manage your orders and listings profile.</p>
+                <div className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-primary text-white rounded-xl font-black text-xs shadow-lg">
+                  Dashboard <ChevronRight size={16} />
+                </div>
+              </div>
+              <BarChart3 className="absolute -bottom-4 -right-4 w-32 h-32 text-white/5 -rotate-6" />
+            </motion.div>
+          )}
+
+          {/* Secondary Action - Perks */}
+          <div className="p-6 bg-accent-subtle rounded-[32px] border border-border-main flex flex-col justify-between group">
+            <div>
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-brand-primary shadow-sm mb-4">
+                <Sparkles size={20} />
+              </div>
+              <h3 className="font-black text-lg text-brand-primary mb-1">Student Perks</h3>
+              <p className="text-text-muted text-xs font-medium">Unlock exclusive campus deals and group features.</p>
+            </div>
+            <button className="mt-6 text-brand-primary text-xs font-black flex items-center gap-1 group-hover:translate-x-1 transition-transform uppercase tracking-wider">
+              Explore Now <ChevronRight size={14} />
             </button>
           </div>
         </div>
 
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold text-text-muted uppercase tracking-widest pl-2 mb-4">Account Settings</h3>
-          {[
-            { icon: Heart, label: 'Manage Favorites', path: '/favorites' },
-            { icon: ShoppingBag, label: 'Transaction History', path: '/purchases' },
-            { icon: ShieldCheck, label: 'Privacy & Security', path: '/settings' },
-          ].map(({ icon: Icon, label, path }) => (
-            <Link 
-              key={path}
-              to={path}
-              className="flex items-center justify-between p-4 bg-white rounded-2xl border border-border-main hover:border-brand-primary hover:bg-bg-light transition-all shadow-sm group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-bg-light flex items-center justify-center text-text-muted group-hover:bg-brand-primary group-hover:text-white transition-all">
-                  <Icon size={18} />
+        {/* Global Settings List */}
+        <div className="pt-4">
+          <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] pl-4 mb-4">Account Settings</h3>
+          <div className="grid grid-cols-1 gap-2">
+            {[
+              { icon: Heart, label: 'Manage Favorites', path: '/favorites', desc: 'Items you have saved' },
+              { icon: ShoppingBag, label: 'Transaction History', path: '/purchases', desc: 'Your orders and sales' },
+              { icon: ShieldCheck, label: 'Privacy & Security', path: '/settings', desc: 'Account protection' },
+            ].map(({ icon: Icon, label, path, desc }) => (
+              <Link 
+                key={path}
+                to={path}
+                className="flex items-center justify-between p-4 bg-white rounded-2xl border border-border-main hover:border-brand-primary group transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-bg-light flex items-center justify-center text-text-muted group-hover:bg-brand-primary group-hover:text-white transition-all shadow-sm">
+                    <Icon size={20} />
+                  </div>
+                  <div>
+                    <span className="font-black text-text-main text-sm block leading-none mb-1">{label}</span>
+                    <span className="text-[10px] text-text-muted font-medium">{desc}</span>
+                  </div>
                 </div>
-                <span className="font-bold text-text-main text-sm">{label}</span>
-              </div>
-              <ChevronRight size={18} className="text-text-muted group-hover:translate-x-1 transition-transform" />
-            </Link>
-          ))}
+                <div className="w-8 h-8 rounded-lg bg-bg-light flex items-center justify-center text-text-muted opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-0 -translate-x-2">
+                  <ChevronRight size={14} />
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </div>

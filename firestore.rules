@@ -41,7 +41,8 @@ service cloud.firestore {
              data.email is string && data.email.size() <= 100 &&
              data.role in ['buyer', 'seller', 'admin'] &&
              data.isVerified is bool &&
-             data.createdAt is timestamp;
+             data.createdAt is timestamp &&
+             (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 1000));
     }
 
     function isVerifiedSeller() {
@@ -111,7 +112,7 @@ service cloud.firestore {
                       incoming().isVerified == existing().isVerified && // Immutable verification
                       incoming().role == existing().role &&             // Immutable role
                       incoming().email == existing().email &&           // Immutable email
-                      incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'courseAndYear', 'studentId', 'universityEmail', 'bio', 'studentIdImage', 'verificationStatus']);
+                      incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'courseAndYear', 'studentId', 'universityEmail', 'bio', 'studentIdImage', 'verificationStatus', 'avatarUrl']);
     }
 
     match /users/{userId}/favorites/{listingId} {
