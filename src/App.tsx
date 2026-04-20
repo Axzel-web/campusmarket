@@ -27,13 +27,18 @@ import {
   Send,
   Sparkles,
   BarChart3,
-  Archive
+  Archive,
+  AlertCircle,
+  X,
+  Trash2,
+  CheckCircle
 } from 'lucide-react';
 import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication } from './types';
-import { cn } from './lib/utils';
+import { cn, compressImage } from './lib/utils';
 import { generateListingDetails } from './services/geminiService';
 import { SellerDashboard } from './components/SellerDashboard';
-import { SplineKeyboardLanding } from './spline-landing/SplineKeyboardLanding';
+import { supabase } from './lib/supabase';
+import { uploadProductImage } from './services/productService';
 
 import { 
   onAuthStateChanged, 
@@ -43,8 +48,7 @@ import {
   setPersistence,
   browserLocalPersistence,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signInAnonymously
+  createUserWithEmailAndPassword
 } from 'firebase/auth';
 import { 
   collection, 
@@ -116,9 +120,9 @@ interface AppContextType {
   chats: Chat[];
   messages: ChatMessage[];
   search: string;
+  listingsLoading: boolean;
   setSearch: (query: string) => void;
   login: () => Promise<void>;
-  continueAsGuest: () => Promise<void>;
   logout: () => void;
   updateProfile: (data: Partial<UserProfile>) => void;
   addListing: (listing: Omit<Listing, 'id' | 'createdAt' | 'sellerId' | 'sellerName' | 'views' | 'inquiries' | 'status'>, imageFiles: File[]) => Promise<void>;
@@ -133,6 +137,10 @@ interface AppContextType {
   reportReview: (reviewId: string, reason: string) => void;
   sellerApplication: SellerApplication | null;
   submitSellerApplication: (data: Omit<SellerApplication, 'userId' | 'status' | 'createdAt'>) => Promise<void>;
+  notifications: {id: string, message: string, type: 'info' | 'success' | 'error'}[];
+  removeNotification: (id: string) => void;
+  addNotification: (message: string, type: 'info' | 'success' | 'error') => void;
+  isSupabaseConnected: boolean;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -157,7 +165,7 @@ const Navbar = () => {
       <div className="max-w-[1280px] mx-auto h-full flex items-center px-4 md:px-6 justify-between">
         <div className="flex items-center gap-4 md:gap-8 flex-1">
           {!showSearch && (
-            <Link to="/market" className="text-xl md:text-2xl font-extrabold text-brand-primary tracking-tight whitespace-nowrap">CampusMarket</Link>
+            <Link to="/" className="text-xl md:text-2xl font-extrabold text-brand-primary tracking-tight whitespace-nowrap">CampusMarket</Link>
           )}
           
           <div className={cn(
@@ -205,7 +213,7 @@ const Sidebar = () => {
   const { user } = useApp();
   
   const navItems = [
-    { icon: Home, label: 'Home Feed', path: '/market' },
+    { icon: Home, label: 'Home Feed', path: '/' },
     { icon: Filter, label: 'Categories', path: '/categories' },
     { icon: Heart, label: 'Favorites', path: '/favorites' },
     { icon: ShoppingBag, label: 'My Orders', path: '/purchases' },
@@ -357,12 +365,20 @@ const ListingCard = ({ listing }: { listing: Listing }) => {
     >
       <Link to={`/listing/${listing.id}`} className="flex-1 flex flex-col">
         <div className="relative aspect-[4/3] overflow-hidden bg-bg-light">
-          <img 
-            src={listing.images[0] || `https://picsum.photos/seed/${listing.id}/400/400`} 
-            alt={listing.title}
-            referrerPolicy="no-referrer"
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
+          {listing.images.length > 0 ? (
+            <img 
+              src={listing.images[0]} 
+              loading="lazy"
+              alt={listing.title}
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-bg-light gap-2">
+              <div className="w-8 h-8 border-2 border-brand-primary/20 border-t-brand-primary rounded-full animate-spin"></div>
+              <span className="text-[10px] font-bold text-brand-primary uppercase tracking-widest animate-pulse">Loading...</span>
+            </div>
+          )}
           <button 
             onClick={(e) => {
               e.preventDefault();
@@ -397,7 +413,7 @@ const ListingCard = ({ listing }: { listing: Listing }) => {
 const MobileTabs = () => {
   const location = useLocation();
   const navItems = [
-    { icon: Home, path: '/market' },
+    { icon: Home, path: '/' },
     { icon: ShoppingBag, path: '/market' },
     { icon: PlusCircle, path: '/sell' },
     { icon: MessageSquare, path: '/messages' },
@@ -467,15 +483,26 @@ const FavoritesPage = () => {
         <div className="py-20 text-center">
           <Heart className="mx-auto text-text-muted mb-3 opacity-20" size={48} />
           <p className="text-text-muted text-sm font-medium">You haven't saved any items yet.</p>
-          <Link to="/market" className="text-brand-primary text-xs font-bold hover:underline mt-2 inline-block">Browse Marketplace</Link>
+          <Link to="/" className="text-brand-primary text-xs font-bold hover:underline mt-2 inline-block">Browse Marketplace</Link>
         </div>
       )}
     </div>
   );
 };
 
+const ListingSkeleton = () => (
+    <div className="bg-white rounded-xl overflow-hidden border border-border-main flex flex-col h-full animate-pulse">
+        <div className="aspect-[4/3] bg-bg-light" />
+        <div className="p-3 space-y-2">
+            <div className="h-5 bg-bg-light rounded w-1/3" />
+            <div className="h-4 bg-bg-light rounded w-full" />
+            <div className="h-3 bg-bg-light rounded w-1/2 mt-auto" />
+        </div>
+    </div>
+);
+
 const HomePage = () => {
-  const { listings, search } = useApp();
+  const { listings, search, listingsLoading } = useApp();
   const [activeCategory, setActiveCategory] = useState('All');
   const [showFilters, setShowFilters] = useState(false);
   const [minPrice, setMinPrice] = useState<string>('');
@@ -610,7 +637,9 @@ const HomePage = () => {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
-        {filteredListings.length > 0 ? (
+        {listingsLoading ? (
+            Array(6).fill(0).map((_, i) => <ListingSkeleton key={i} />)
+        ) : filteredListings.length > 0 ? (
           filteredListings.map(listing => (
             <div key={listing.id}>
               <ListingCard listing={listing} />
@@ -627,14 +656,6 @@ const HomePage = () => {
   );
 };
 
-const LandingPage = () => {
-  const { user } = useApp();
-
-  if (user) return <Navigate to="/market" replace />;
-
-  return <SplineKeyboardLanding />;
-};
-
 const themes = [
   { background: "#1A1A2E", color: "#FFFFFF", primaryColor: "#0F3460" },
   { background: "#461220", color: "#FFFFFF", primaryColor: "#E94560" },
@@ -646,7 +667,7 @@ const themes = [
 ];
 
 const LoginPage = () => {
-  const { login, user, continueAsGuest } = useApp();
+  const { login, user } = useApp();
   const [loggingIn, setLoggingIn] = useState(false);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
@@ -654,7 +675,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [theme, setTheme] = useState(themes[6]); // Default to Mint
 
-  if (user) return <Navigate to="/market" replace />;
+  if (user) return <Navigate to="/" replace />;
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -678,15 +699,6 @@ const LoginPage = () => {
     setLoggingIn(true);
     try {
       await login();
-    } finally {
-      setLoggingIn(false);
-    }
-  };
-
-  const handleContinueAsGuest = async () => {
-    setLoggingIn(true);
-    try {
-      await continueAsGuest();
     } finally {
       setLoggingIn(false);
     }
@@ -815,15 +827,6 @@ const LoginPage = () => {
               ) : (
                 mode === 'signup' ? 'REGISTER' : 'ENTER'
               )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleContinueAsGuest}
-              disabled={loggingIn}
-              className="w-full py-2.5 rounded-xl text-[8px] sm:text-[9px] font-bold tracking-[0.2em] uppercase opacity-50 hover:opacity-100 transition-opacity disabled:opacity-30 border border-current border-opacity-15"
-            >
-              Continue as Guest
             </button>
           </form>
 
@@ -1267,28 +1270,21 @@ const SellPage = () => {
       return;
     }
     
-    setLoading(true);
-    try {
-      await addListing({
-        title: formData.title,
-        price: Number(formData.price),
-        description: formData.description,
-        category: formData.category,
-        condition: formData.condition,
-        quantity: Number(formData.quantity),
-        location: formData.location,
-        contactMethod: formData.contactMethod,
-        tags: formData.tags,
-        images: [] // images handled inside addListing
-      }, imageFiles);
-      
-      navigate('/dashboard');
-    } catch (err) {
-      console.error(err);
-      alert("Failed to post listing. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    addListing({
+      title: formData.title,
+      price: Number(formData.price),
+      description: formData.description,
+      category: formData.category,
+      condition: formData.condition,
+      quantity: Number(formData.quantity),
+      location: formData.location,
+      contactMethod: formData.contactMethod,
+      tags: formData.tags,
+      images: [] // images handled inside addListing
+    }, imageFiles);
+    
+    // Auto-navigate immediately to Home Feed for "instant" feel
+    navigate('/');
   };
 
   return (
@@ -1436,7 +1432,10 @@ const SellPage = () => {
           className="w-full py-4 bg-brand-primary text-white rounded-2xl font-black shadow-xl shadow-brand-primary/20 hover:bg-brand-primary-hover active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {loading ? (
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span>Posting...</span>
+            </>
           ) : (
             <>Post Product for Sale</>
           )}
@@ -1448,9 +1447,10 @@ const SellPage = () => {
 
   const ListingDetail = () => {
     const { id } = useParams<{ id: string }>();
-    const { listings, user, createChat } = useApp();
+    const { listings, user, createChat, deleteListing, markAsSold } = useApp();
     const navigate = useNavigate();
     const listing = listings.find(l => l.id === id);
+    const [activeImageIndex, setActiveImageIndex] = useState(0);
   
     useEffect(() => {
       if (id && user && listing && listing.sellerId !== user.id) {
@@ -1469,6 +1469,8 @@ const SellPage = () => {
     navigate(`/chat/${chatId}`);
   };
 
+  const images = listing.images.length > 0 ? listing.images : [`https://picsum.photos/seed/${listing.id}/800/800`];
+
   return (
     <div className="flex-1 px-6 py-6 overflow-y-auto no-scrollbar max-w-4xl mx-auto w-full">
        <button onClick={() => navigate(-1)} className="mb-6 p-2 bg-white rounded-xl border border-border-main shadow-sm flex items-center gap-2 text-sm font-medium hover:bg-bg-light transition-colors">
@@ -1476,12 +1478,32 @@ const SellPage = () => {
       </button>
 
       <div className="grid md:grid-cols-2 gap-8">
-        <div className="aspect-square rounded-3xl overflow-hidden bg-bg-light border border-border-main">
-          <img 
-            src={listing.images[0] || `https://picsum.photos/seed/${listing.id}/800/800`} 
-            alt={listing.title}
-            className="w-full h-full object-cover"
-          />
+        <div className="space-y-4">
+          <div className="aspect-square rounded-3xl overflow-hidden bg-bg-light border border-border-main">
+            <img 
+              src={images[activeImageIndex]} 
+              alt={listing.title}
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover transition-all duration-300"
+            />
+          </div>
+          
+          {images.length > 1 && (
+            <div className="grid grid-cols-4 gap-3">
+              {images.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setActiveImageIndex(idx)}
+                  className={cn(
+                    "aspect-square rounded-xl overflow-hidden border-2 transition-all",
+                    activeImageIndex === idx ? "border-brand-primary ring-2 ring-brand-primary/20 scale-95" : "border-transparent opacity-60 hover:opacity-100"
+                  )}
+                >
+                  <img src={img} alt={`${listing.title} ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="px-4 space-y-6">
@@ -1519,7 +1541,7 @@ const SellPage = () => {
             ))}
           </div>
 
-          {user?.id !== listing.sellerId && (
+          {user?.id !== listing.sellerId ? (
             <div className="flex gap-3">
               <button 
                 onClick={handleMessage}
@@ -1527,6 +1549,35 @@ const SellPage = () => {
               >
                 <MessageSquare size={20} /> Chat Seller
               </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                <p className="text-xs text-amber-800 font-bold flex items-center gap-2">
+                  <AlertCircle size={14} /> Seller Controls
+                </p>
+                <p className="text-[10px] text-amber-700 mt-1">You are the owner of this listing. You can manage it from here.</p>
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to delete this listing?')) {
+                      deleteListing(listing.id);
+                      navigate('/');
+                    }
+                  }}
+                  className="flex-1 py-4 border-2 border-red-500 text-red-500 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-50"
+                >
+                  <Trash2 size={20} /> Delete Product
+                </button>
+                <button 
+                  onClick={() => markAsSold(listing.id)}
+                  disabled={listing.status === 'sold'}
+                  className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <CheckCircle size={20} /> {listing.status === 'sold' ? 'Sold Out' : 'Mark as Sold'}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -1555,6 +1606,20 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [messages] = useState<ChatMessage[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [listingsLoading, setListingsLoading] = useState(true);
+  const [notifications, setNotifications] = useState<{id: string, message: string, type: 'info' | 'success' | 'error'}[]>([]);
+
+  const addNotification = (message: string, type: 'info' | 'success' | 'error') => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setNotifications(prev => [...prev, { id, message, type }]);
+    if (type === 'success') {
+      setTimeout(() => removeNotification(id), 5000);
+    }
+  };
+
+  const removeNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
 
   // Connection Test
   useEffect(() => {
@@ -1610,11 +1675,6 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
           createdAt: serverTimestamp()
         };
         await setDoc(userRef, profileData);
-        setUser({
-          ...profileData,
-          createdAt: Date.now(),
-          id: fbUser.uid
-        } as UserProfile);
       }
       setLoading(false);
     }, (err) => {
@@ -1643,8 +1703,10 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
         createdAt: toMillis(d.data().createdAt) 
       } as Listing));
       setListings(data);
+      setListingsLoading(false);
     }, (error) => {
       console.error("Listings sync error:", error);
+      setListingsLoading(false);
     });
     return unsubscribe;
   }, [user]);
@@ -1746,14 +1808,6 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const continueAsGuest = async () => {
-    try {
-      await signInAnonymously(auth);
-    } catch (error) {
-      console.error("Guest sign-in error:", error);
-    }
-  };
-
   const logout = async () => {
     await signOut(auth);
   };
@@ -1771,18 +1825,28 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const addListing = async (data: any, imageFiles: File[]) => {
     if (!user) return;
+    
+    addNotification(`Compressing and uploading images for "${data.title}"...`, 'info');
+    
     try {
-      const imageUrls: string[] = [];
+      // 1. COMPRESS & UPLOAD IMAGES FIRST (STRICT FLOW)
+      // We do not continue if this fails. No placeholders allowed.
+      const uploadPromises = imageFiles.map(async (file, index) => {
+        const compressedBlob = await compressImage(file);
+        // Use Supabase Storage for upload
+        return await uploadProductImage(compressedBlob, user.id);
+      });
       
-      // Upload images to storage
-      for (const file of imageFiles) {
-        const imageRef = ref(storage, `listings/${user.id}/${Date.now()}-${file.name}`);
-        const snapshot = await uploadBytes(imageRef, file);
-        const url = await getDownloadURL(snapshot.ref);
-        imageUrls.push(url);
+      const imageUrls = await Promise.all(uploadPromises);
+      
+      if (imageUrls.length === 0) {
+        throw new Error("At least one image is required for listing.");
       }
 
-      await addDoc(collection(db, 'listings'), {
+      console.log(`Images uploaded successfully to Supabase. Saving records...`);
+
+      // 2. Create the Firebase document WITH the real image URLs
+      const listingRef = await addDoc(collection(db, 'listings'), {
         ...data,
         images: imageUrls,
         sellerId: user.id,
@@ -1793,18 +1857,77 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
         inquiries: 0,
         createdAt: serverTimestamp()
       });
-    } catch (error) {
-      handleFirestoreError(error, 'create', 'listings');
+
+      // 3. Create the Supabase record WITH the real image URL
+      if (supabase) {
+        try {
+          const { error: supabaseError } = await supabase
+            .from('listings')
+            .insert([{
+              id: listingRef.id,
+              title: data.title,
+              price: data.price,
+              category: data.category,
+              seller_id: user.id,
+              seller_name: user.fullName,
+              status: 'active',
+              description: data.description,
+              image_url: imageUrls[0], // Main thumbnail
+              created_at: new Date().toISOString()
+            }]);
+          
+          if (supabaseError) {
+             console.warn("Supabase insert failed:", supabaseError.message);
+          }
+
+          // Optional: Add all images to the images table
+          const imageRecords = imageUrls.map(url => ({
+            listing_id: listingRef.id,
+            url: url
+          }));
+          
+          await supabase
+            .from('listing_images')
+            .insert(imageRecords);
+
+        } catch (err) {
+          console.warn("Supabase sync error:", err);
+        }
+      }
+      
+      addNotification(`"${data.title}" has been posted successfully!`, 'success');
+
+    } catch (error: any) {
+      console.error("Strict upload error:", error);
+      const errorMsg = error.message || "Upload failed. Please check your connection and storage permissions.";
+      addNotification(`Post Failed: ${errorMsg}`, 'error');
+      // Do not handle Firestore error here if we didn't even reach Firestore
+      if (error.code && error.code.includes('firestore')) {
+        handleFirestoreError(error, 'create', 'listings');
+      }
     }
   };
 
   const updateListing = async (listingId: string, data: Partial<Listing>) => {
     if (!user) return;
     try {
+      // 1. Update Firebase
       await updateDoc(doc(db, 'listings', listingId), {
         ...data,
         updatedAt: serverTimestamp()
       });
+
+      // 2. Mirror to Supabase
+      if (supabase) {
+        try {
+          await supabase
+            .from('listings')
+            .update(data)
+            .eq('id', listingId);
+        } catch (err) {
+          console.warn("Supabase update mirror failed:", err);
+        }
+      }
     } catch (error) {
       handleFirestoreError(error, 'update', `listings/${listingId}`);
     }
@@ -1813,7 +1936,23 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const deleteListing = async (listingId: string) => {
     if (!user) return;
     try {
+      // 1. Delete from Firebase (Primary)
       await deleteDoc(doc(db, 'listings', listingId));
+      
+      // 2. Mirror deletion to Supabase
+      if (supabase) {
+        try {
+          await supabase
+            .from('listings')
+            .delete()
+            .eq('id', listingId);
+          console.log("Successfully removed listing from Supabase.");
+        } catch (err) {
+          console.warn("Supabase delete mirror failed:", err);
+        }
+      }
+
+      addNotification('Listing deleted successfully.', 'info');
     } catch (error) {
       handleFirestoreError(error, 'delete', `listings/${listingId}`);
     }
@@ -1822,10 +1961,26 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const markAsSold = async (listingId: string) => {
     if (!user) return;
     try {
+      // 1. Update Firebase
       await updateDoc(doc(db, 'listings', listingId), {
         status: 'sold',
         updatedAt: serverTimestamp()
       });
+
+      // 2. Mirror to Supabase
+      if (supabase) {
+        try {
+          await supabase
+            .from('listings')
+            .update({ status: 'sold' })
+            .eq('id', listingId);
+          console.log("Successfully marked as sold in Supabase.");
+        } catch (err) {
+          console.warn("Supabase sold mirror failed:", err);
+        }
+      }
+
+      addNotification('Item marked as sold!', 'success');
     } catch (error) {
       handleFirestoreError(error, 'update', `listings/${listingId}`);
     }
@@ -1943,12 +2098,16 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
+  const isSupabaseConnected = !!supabase;
+
   return (
     <AppContext.Provider value={{ 
-      user, loading, listings, favorites, reviews, chats, messages, search, setSearch,
-      login, continueAsGuest, logout, updateProfile, addListing, updateListing, deleteListing, markAsSold, toggleFavorite, createChat, sendMessage,
+      user, loading, listings, favorites, reviews, chats, messages, search, setSearch, listingsLoading,
+      login, logout, updateProfile, addListing, updateListing, deleteListing, markAsSold, toggleFavorite, createChat, sendMessage,
       replyToReview, archiveReview, reportReview,
-      sellerApplication, submitSellerApplication
+      sellerApplication, submitSellerApplication,
+      notifications, addNotification, removeNotification,
+      isSupabaseConnected
     }}>
       {children}
     </AppContext.Provider>
@@ -2030,7 +2189,7 @@ const ChatPage = () => {
 };
 
 const SellerDashboardPage = () => {
-  const { user, reviews, listings, replyToReview, archiveReview, reportReview, markAsSold, deleteListing } = useApp();
+  const { user, reviews, listings, replyToReview, archiveReview, reportReview, markAsSold, deleteListing, isSupabaseConnected } = useApp();
   if (!user) return null;
   return (
     <SellerDashboard 
@@ -2042,6 +2201,7 @@ const SellerDashboardPage = () => {
       onReport={reportReview}
       onMarkAsSold={markAsSold}
       onDeleteListing={deleteListing}
+      isSupabaseConnected={isSupabaseConnected}
     />
   );
 };
@@ -2084,13 +2244,55 @@ const MessagesListPage = () => {
     );
 };
 
+const NotificationOverlay = () => {
+    const { notifications, removeNotification } = useApp();
+    return (
+        <div className="fixed top-20 right-6 z-[9999] flex flex-col gap-3 pointer-events-none w-full max-w-xs">
+            <AnimatePresence>
+                {notifications.map((notif) => (
+                    <motion.div
+                        key={notif.id}
+                        initial={{ opacity: 0, x: 50, scale: 0.9 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, x: 20, scale: 0.95 }}
+                        className={cn(
+                            "pointer-events-auto p-4 rounded-2xl border shadow-2xl flex items-start gap-3 backdrop-blur-md",
+                            notif.type === 'success' ? "bg-green-50/90 border-green-200 text-green-800" :
+                            notif.type === 'error' ? "bg-red-50/90 border-red-200 text-red-800" :
+                            "bg-white/90 border-border-main text-text-main"
+                        )}
+                    >
+                        <div className="mt-0.5">
+                            {notif.type === 'success' && <ShieldCheck size={18} className="text-green-500" />}
+                            {notif.type === 'error' && <AlertCircle size={18} className="text-red-500" />}
+                            {notif.type === 'info' && <Sparkles size={18} className="text-blue-500" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold leading-tight">{notif.message}</p>
+                        </div>
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                removeNotification(notif.id);
+                            }}
+                            className="p-1 hover:bg-black/5 rounded-lg transition-colors"
+                        >
+                            <X size={14} className="opacity-50" />
+                        </button>
+                    </motion.div>
+                ))}
+            </AnimatePresence>
+        </div>
+    );
+};
+
 export default function App() {
   return (
     <AppProvider>
       <Router>
+        <NotificationOverlay />
         <AnimatePresence mode="wait">
           <Routes>
-            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/*" element={
               <ProtectedRoute>
@@ -2100,6 +2302,7 @@ export default function App() {
                     <Sidebar />
                     <main className="flex-1 flex flex-col pb-20 md:pb-0 overflow-y-auto">
                       <Routes>
+                        <Route path="/" element={<HomePage />} />
                         <Route path="/market" element={<HomePage />} />
                         <Route path="/categories" element={<CategoriesPage />} />
                         <Route path="/favorites" element={<FavoritesPage />} />
@@ -2128,6 +2331,6 @@ export default function App() {
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useApp();
   if (loading) return null;
-  if (!user) return <Navigate to="/" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 };

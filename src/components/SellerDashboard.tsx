@@ -34,6 +34,7 @@ interface SellerDashboardProps {
   onReport: (reviewId: string, reason: string) => void;
   onMarkAsSold: (listingId: string) => void;
   onDeleteListing: (listingId: string) => void;
+  isSupabaseConnected?: boolean;
 }
 
 export const SellerDashboard: React.FC<SellerDashboardProps> = ({ 
@@ -44,7 +45,8 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
   onArchive, 
   onReport,
   onMarkAsSold,
-  onDeleteListing
+  onDeleteListing,
+  isSupabaseConnected = false
 }) => {
   const [activeTab, setActiveTab] = useState<'reviews' | 'products'>('products');
   const [searchTerm, setSearchTerm] = useState('');
@@ -133,7 +135,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
             <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Seller Dashboard</p>
           </div>
         </div>
-        <div className="relative">
+        <div className="flex items-center gap-3">
           <button 
             onClick={() => setShowNotifications(!showNotifications)}
             className="p-2.5 rounded-xl bg-bg-light border border-border-main text-text-muted hover:text-brand-primary transition-all relative"
@@ -143,6 +145,19 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
               <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-brand-primary rounded-full border-2 border-white"></span>
             )}
           </button>
+          
+          <div className={cn(
+            "hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all",
+            isSupabaseConnected 
+              ? "bg-emerald-50 border-emerald-100 text-emerald-600" 
+              : "bg-gray-50 border-gray-100 text-gray-400 opacity-60"
+          )}>
+            <div className={cn(
+              "w-1.5 h-1.5 rounded-full animate-pulse",
+              isSupabaseConnected ? "bg-emerald-500" : "bg-gray-400"
+            )} />
+            Supabase Sync {isSupabaseConnected ? 'Active' : 'Offline'}
+          </div>
         </div>
       </div>
 
@@ -219,8 +234,15 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
                     key={listing.id}
                     className="bg-white rounded-3xl p-4 border border-border-main shadow-sm flex items-center gap-6"
                   >
-                    <div className="w-24 h-24 rounded-2xl overflow-hidden border border-border-main flex-shrink-0">
-                      <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover" />
+                    <div className="w-24 h-24 rounded-2xl overflow-hidden border border-border-main flex-shrink-0 bg-bg-light relative">
+                      {listing.images && listing.images.length > 0 ? (
+                        <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-bg-light">
+                          <div className="w-6 h-6 border-2 border-brand-primary/20 border-t-brand-primary rounded-full animate-spin mb-1"></div>
+                          <span className="text-[8px] font-black text-brand-primary uppercase tracking-tighter animate-pulse">Syncing...</span>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex-1 min-w-0">
