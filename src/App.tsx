@@ -416,26 +416,65 @@ const ListingCard = ({ listing }: { listing: Listing }) => {
 const MobileTabs = () => {
   const location = useLocation();
   const navItems = [
-    { icon: ShoppingBag, path: '/market' },
-    { icon: PlusCircle, path: '/sell' },
-    { icon: MessageSquare, path: '/messages' },
-    { icon: User, path: '/profile' },
+    { icon: ShoppingBag, label: 'Shop', path: '/market' },
+    { icon: PlusCircle, label: 'Sell', path: '/sell' },
+    { icon: MessageSquare, label: 'Chat', path: '/messages' },
+    { icon: User, label: 'User', path: '/profile' },
   ];
 
+  const activeIndex = navItems.findIndex(item => item.path === location.pathname);
+
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border-main flex justify-around p-3 pb-safe z-50">
-      {navItems.map(({ icon: Icon, path }) => (
-        <Link 
-          key={path} 
-          to={path}
-          className={cn(
-            "p-2 rounded-xl transition-colors",
-            location.pathname === path ? "bg-accent-subtle text-brand-primary" : "text-text-muted"
-          )}
+    <div className="md:hidden fixed bottom-2 left-0 right-0 z-50 flex justify-center px-4 pb-safe pointer-events-none">
+      <div className="relative w-full max-w-[440px] h-16 bg-white shadow-[0_-5px_25px_rgba(0,0,0,0.08)] rounded-3xl flex pointer-events-auto overflow-visible">
+        {/* Magic Indicator */}
+        <motion.div 
+          className="absolute top-[-50%] w-16 h-16 bg-brand-primary rounded-full border-[6px] border-[#f3f4f6] shadow-xl z-0"
+          initial={false}
+          animate={{
+            left: `calc(${activeIndex * 25}% + 12.5% - 32px)`,
+          }}
+          transition={{ type: "spring", stiffness: 300, damping: 28 }}
         >
-          <Icon size={24} />
-        </Link>
-      ))}
+          {/* Side Curves to create the gap effect */}
+          <div className="absolute top-1/2 left-[-22px] w-5 h-5 bg-transparent rounded-tr-[22px] shadow-[2px_-12px_0_0_#f3f4f6]"></div>
+          <div className="absolute top-1/2 right-[-22px] w-5 h-5 bg-transparent rounded-tl-[22px] shadow-[-2px_-12px_0_0_#f3f4f6]"></div>
+        </motion.div>
+
+        {navItems.map(({ icon: Icon, label, path }, idx) => {
+          const isActive = location.pathname === path;
+          return (
+            <Link 
+              key={path} 
+              to={path}
+              className="relative z-10 flex-1 h-full flex flex-col items-center justify-center"
+            >
+              <motion.div
+                animate={{
+                  y: isActive ? -32 : 0,
+                  color: isActive ? '#FFFFFF' : '#94A3B8',
+                  scale: isActive ? 1.1 : 1
+                }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              >
+                <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
+              </motion.div>
+              <motion.span
+                initial={false}
+                animate={{
+                  opacity: isActive ? 1 : 0,
+                  y: isActive ? 4 : 20,
+                  scale: isActive ? 1 : 0.5
+                }}
+                className="absolute bottom-2 text-[9px] font-black uppercase tracking-wider text-text-main"
+                transition={{ duration: 0.3 }}
+              >
+                {label}
+              </motion.span>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 };
