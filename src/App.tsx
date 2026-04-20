@@ -36,6 +36,7 @@ import {
 import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication } from './types';
 import { cn, compressImage } from './lib/utils';
 import { generateListingDetails } from './services/geminiService';
+import { LandingPage } from './components/LandingPage';
 import { SellerDashboard } from './components/SellerDashboard';
 import { supabase } from './lib/supabase';
 import { uploadProductImage } from './services/productService';
@@ -115,6 +116,7 @@ interface AppContextType {
   user: UserProfile | null;
   loading: boolean;
   listings: Listing[];
+  myListings: Listing[];
   favorites: string[];
   reviews: Review[];
   chats: Chat[];
@@ -675,7 +677,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [theme, setTheme] = useState(themes[6]); // Default to Mint
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/market" replace />;
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -744,6 +746,9 @@ const LoginPage = () => {
         >
           {/* Header Section - More Compact */}
           <div className="flex flex-col items-center mb-4 sm:mb-6">
+            <Link to="/" className="absolute top-4 left-4 p-2 bg-white/20 rounded-full hover:bg-white/40 transition-all">
+              <ArrowLeft size={18} />
+            </Link>
             <div className="w-full max-w-[120px] sm:max-w-[150px] mb-3">
               <img 
                 src="https://raw.githubusercontent.com/hicodersofficial/glassmorphism-login-form/master/assets/illustration.png" 
@@ -1599,6 +1604,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [fbUser, setFbUser] = useState<any>(null);
   const [listings, setListings] = useState<Listing[]>([]);
+  const [myListings, setMyListings] = useState<Listing[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [sellerApplication, setSellerApplication] = useState<SellerApplication | null>(null);
@@ -1707,6 +1713,30 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }, (error) => {
       console.error("Listings sync error:", error);
       setListingsLoading(false);
+    });
+    return unsubscribe;
+  }, [user]);
+
+  // Sync My Listings (for Dashboard - includes all statuses)
+  useEffect(() => {
+    if (!user) {
+      setMyListings([]);
+      return;
+    }
+    const q = query(
+      collection(db, 'listings'), 
+      where('sellerId', '==', user.id),
+      orderBy('createdAt', 'desc')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(d => ({ 
+        ...d.data(), 
+        id: d.id, 
+        createdAt: toMillis(d.data().createdAt) 
+      } as Listing));
+      setMyListings(data);
+    }, (error) => {
+      console.error("My Listings sync error:", error);
     });
     return unsubscribe;
   }, [user]);
@@ -2102,7 +2132,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AppContext.Provider value={{ 
-      user, loading, listings, favorites, reviews, chats, messages, search, setSearch, listingsLoading,
+      user, loading, listings, myListings, favorites, reviews, chats, messages, search, setSearch, listingsLoading,
       login, logout, updateProfile, addListing, updateListing, deleteListing, markAsSold, toggleFavorite, createChat, sendMessage,
       replyToReview, archiveReview, reportReview,
       sellerApplication, submitSellerApplication,
@@ -2189,13 +2219,13 @@ const ChatPage = () => {
 };
 
 const SellerDashboardPage = () => {
-  const { user, reviews, listings, replyToReview, archiveReview, reportReview, markAsSold, deleteListing, isSupabaseConnected } = useApp();
+  const { user, reviews, myListings, replyToReview, archiveReview, reportReview, markAsSold, deleteListing, isSupabaseConnected } = useApp();
   if (!user) return null;
   return (
     <SellerDashboard 
       user={user} 
       reviews={reviews} 
-      listings={listings}
+      listings={myListings}
       onReply={replyToReview}
       onArchive={archiveReview}
       onReport={reportReview}
@@ -2293,6 +2323,7 @@ export default function App() {
         <NotificationOverlay />
         <AnimatePresence mode="wait">
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/*" element={
               <ProtectedRoute>
@@ -2302,7 +2333,7 @@ export default function App() {
                     <Sidebar />
                     <main className="flex-1 flex flex-col pb-20 md:pb-0 overflow-y-auto">
                       <Routes>
-                        <Route path="/" element={<HomePage />} />
+                        <Route path="/" element={<Navigate to="/market" replace />} />
                         <Route path="/market" element={<HomePage />} />
                         <Route path="/categories" element={<CategoriesPage />} />
                         <Route path="/favorites" element={<FavoritesPage />} />

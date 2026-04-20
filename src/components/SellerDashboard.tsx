@@ -68,6 +68,8 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
     const avgRating = totalReviews > 0 ? approved.reduce((sum, r) => sum + r.rating, 0) / totalReviews : 0;
     
     const activeProducts = myListings.filter(l => l.status === 'active').length;
+    const itemsSold = myListings.filter(l => l.status === 'sold').length;
+    const totalRevenue = myListings.filter(l => l.status === 'sold').reduce((sum, l) => sum + l.price, 0);
     const totalViews = myListings.reduce((sum, l) => sum + (l.views || 0), 0);
     const totalInquiries = myListings.reduce((sum, l) => sum + (l.inquiries || 0), 0);
     
@@ -78,7 +80,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
       return date >= startOfToday;
     }).length;
 
-    return { totalReviews, avgRating, activeProducts, totalViews, totalInquiries, newToday };
+    return { totalReviews, avgRating, activeProducts, itemsSold, totalRevenue, totalViews, totalInquiries, newToday };
   }, [reviews, myListings]);
 
   // Filtering logic
@@ -163,27 +165,28 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
 
       <div className="max-w-6xl mx-auto px-6 pt-8 space-y-8">
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {[
-            { label: 'Active Products', value: stats.activeProducts, icon: ShoppingBag, color: 'text-brand-primary', bg: 'bg-accent-subtle' },
+            { label: 'Total Items Sold', value: stats.itemsSold, icon: Package, color: 'text-brand-primary', bg: 'bg-accent-subtle' },
+            { label: 'Total Revenue', value: `₱${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50' },
             { label: 'Average Rating', value: stats.avgRating.toFixed(1), icon: Star, color: 'text-amber-500', bg: 'bg-amber-50' },
-            { label: 'Total Item Views', value: stats.totalViews, icon: Eye, color: 'text-blue-500', bg: 'bg-blue-50' },
-            { label: 'Customer Inquiries', value: stats.totalInquiries, icon: MessageCircle, color: 'text-green-500', bg: 'bg-green-50' },
+            { label: 'Active Products', value: stats.activeProducts, icon: ShoppingBag, color: 'text-blue-500', bg: 'bg-blue-50' },
+            { label: 'Total Item Views', value: stats.totalViews, icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50' },
           ].map((stat, i) => (
             <motion.div 
               key={i}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="bg-white rounded-3xl p-6 border border-border-main shadow-sm flex items-start justify-between"
+              className="bg-white rounded-2xl p-5 border border-border-main shadow-sm flex flex-col justify-between"
             >
-              <div>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1">{stat.label}</p>
-                <h3 className="text-2xl font-black text-text-main">{stat.value}</h3>
+              <div className="flex items-start justify-between mb-2">
+                <p className="text-[10px] font-black text-text-muted uppercase tracking-widest">{stat.label}</p>
+                <div className={cn("p-2 rounded-lg", stat.bg)}>
+                  <stat.icon className={stat.color} size={16} fill={stat.icon === Star ? "currentColor" : "none"} />
+                </div>
               </div>
-              <div className={cn("p-2.5 rounded-xl", stat.bg)}>
-                <stat.icon className={stat.color} size={20} fill={stat.icon === Star ? "currentColor" : "none"} />
-              </div>
+              <h3 className="text-xl font-black text-text-main leading-tight">{stat.value}</h3>
             </motion.div>
           ))}
         </div>
