@@ -26,6 +26,7 @@ export interface Listing {
   category: string;
   sellerId: string;
   sellerName: string;
+  sellerAvatar?: string;
   sellerRating?: number;
   status: 'active' | 'sold' | 'archived';
   tags: string[];

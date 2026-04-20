@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useApp } from '../App';
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import gsap from 'gsap';
@@ -11,6 +12,14 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
  */
 export const LandingPage: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { user, loading } = useApp();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/market');
+    }
+  }, [user, loading, navigate]);
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger);

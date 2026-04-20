@@ -4,11 +4,11 @@ import { supabase } from '../lib/supabase';
  * SERVICE: User Management (Supabase-specific storage)
  */
 
-export const uploadAvatar = async (file: File | Blob, userId: string): Promise<string> => {
+export const uploadUserMedia = async (file: File | Blob, userId: string, folder: 'avatars' | 'identities'): Promise<string> => {
   if (!supabase) throw new Error('Supabase not connected');
 
   const fileExt = 'jpg';
-  const fileName = `avatars/${userId}-${Date.now()}.${fileExt}`;
+  const fileName = `${folder}/${userId}-${Date.now()}.${fileExt}`;
   
   // We use the unified 'listings' bucket for all media to reduce setup complexity
   const { error: uploadError } = await supabase.storage
@@ -31,4 +31,31 @@ export const uploadAvatar = async (file: File | Blob, userId: string): Promise<s
     .getPublicUrl(fileName);
 
   return publicUrl;
+};
+
+// Backward compatibility or specific alias
+export const uploadAvatar = (file: File | Blob, userId: string) => uploadUserMedia(file, userId, 'avatars');
+export const uploadStudentId = (file: File | Blob, userId: string) => uploadUserMedia(file, userId, 'identities');
+
+/**
+ * Mirror profile data to Supabase
+ */
+export const syncUserProfileToSupabase = async (userId: string, data: any) => {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({
+        id: userId,
+        full_name: data.fullName,
+        email: data.email,
+        avatar_url: data.avatarUrl || null,
+        course_and_year: data.courseAndYear || null,
+        bio: data.bio || null,
+        updated_at: new Date().toISOString()
+      });
+    if (error) console.warn("Supabase profile sync error:", error.message);
+  } catch (err) {
+    console.warn("Supabase profile sync catch:", err);
+  }
 };

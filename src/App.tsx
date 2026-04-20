@@ -36,7 +36,7 @@ import {
 import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication } from './types';
 import { cn, compressImage } from './lib/utils';
 import { generateListingDetails } from './services/geminiService';
-import { uploadAvatar } from './services/userService';
+import { uploadAvatar, uploadStudentId, syncUserProfileToSupabase } from './services/userService';
 import { LandingPage } from './components/LandingPage';
 import { SellerDashboard } from './components/SellerDashboard';
 import { LoadingAnimation } from './components/LoadingAnimation';
@@ -149,7 +149,7 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
-const useApp = () => {
+export const useApp = () => {
   const context = useContext(AppContext);
   if (!context) throw new Error('useApp must be used within AppProvider');
   return context;
@@ -403,15 +403,23 @@ const ListingCard = ({ listing }: { listing: Listing }) => {
         <div className="p-3 flex flex-col flex-1">
           <p className="text-brand-primary font-bold text-base">₱{listing.price.toLocaleString()}</p>
           <h3 className="font-medium text-text-main text-[13px] line-clamp-2 mt-0.5 leading-snug">{listing.title}</h3>
-          <p className="text-[10px] text-text-muted mt-auto pt-2 flex items-center gap-1">
-            {listing.sellerName} 
+          <div className="text-[10px] text-text-muted mt-auto pt-2 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 min-w-0">
+               <div className="w-5 h-5 rounded-full bg-accent-subtle flex-shrink-0 flex items-center justify-center font-bold text-brand-primary text-[8px] uppercase border border-border-main overflow-hidden">
+                {listing.sellerAvatar ? (
+                  <img src={listing.sellerAvatar} alt={listing.sellerName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  listing.sellerName[0]
+                )}
+              </div>
+              <span className="truncate">{listing.sellerName}</span>
+            </div>
             {listing.sellerRating && (
-              <span className="flex items-center gap-0.5 text-amber-500">
-                • <Star size={10} fill="currentColor" /> {listing.sellerRating.toFixed(1)}
+              <span className="flex items-center gap-0.5 text-amber-500 flex-shrink-0">
+                <Star size={10} fill="currentColor" /> {listing.sellerRating.toFixed(1)}
               </span>
             )}
-            • {new Date(listing.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-          </p>
+          </div>
         </div>
       </Link>
     </motion.div>
@@ -1110,26 +1118,40 @@ const VerificationPage = () => {
     studentId: '',
     bio: user?.bio || '',
     contactDetails: '',
-    image: null as string | null
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedFile) {
+        alert("Please upload your Student ID photo.");
+        return;
+    }
+
     setSubmitting(true);
     try {
       await submitSellerApplication({
         fullName: formData.fullName,
         school: formData.courseAndYear,
         contactLink: formData.contactDetails,
-        photoURL: formData.image || 'uploaded_image_url', // In a real app, this would be a Storage URL
-      });
+        photoURL: '', // Handled by providing selectedFile
+      }, selectedFile);
       navigate('/profile');
     } catch (err) {
       console.error(err);
       alert("Failed to submit application. Please try again.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
     }
   };
 
@@ -1256,8 +1278,8 @@ const VerificationPage = () => {
             <div>
               <label className="block text-xs font-bold text-text-muted uppercase tracking-widest mb-1.5 ml-1">Snap your Student ID</label>
               <div className="relative h-56 rounded-2xl bg-bg-light border-2 border-dashed border-border-main flex flex-col items-center justify-center gap-3 group cursor-pointer hover:bg-white hover:border-brand-primary/50 transition-all overflow-hidden">
-                {formData.image ? (
-                  <img src={formData.image} alt="ID Preview" className="w-full h-full object-cover" />
+                {previewUrl ? (
+                  <img src={previewUrl} alt="ID Preview" className="w-full h-full object-cover" />
                 ) : (
                   <>
                     <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm border border-border-main text-text-muted group-hover:text-brand-primary transition-colors">
@@ -1273,10 +1295,7 @@ const VerificationPage = () => {
                   type="file" 
                   accept="image/*" 
                   className="absolute inset-0 opacity-0 cursor-pointer"
-                  onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) setFormData({...formData, image: URL.createObjectURL(file)});
-                  }}
+                  onChange={handleFileChange}
                 />
               </div>
             </div>
@@ -1381,7 +1400,7 @@ const SellPage = () => {
     }, imageFiles);
     
     // Auto-navigate immediately to Home Feed for "instant" feel
-    navigate('/');
+    navigate('/market');
   };
 
   return (
@@ -1614,8 +1633,12 @@ const SellPage = () => {
 
           <div className="p-4 bg-bg-light rounded-2xl flex items-center justify-between border border-border-main">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center font-bold text-brand-primary border border-border-main shadow-sm text-xl uppercase">
-                {listing.sellerName[0]}
+              <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center font-bold text-brand-primary border border-border-main shadow-sm text-xl uppercase overflow-hidden">
+                {listing.sellerAvatar ? (
+                  <img src={listing.sellerAvatar} alt={listing.sellerName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  listing.sellerName[0]
+                )}
               </div>
               <div>
                 <p className="font-bold text-text-main">{listing.sellerName}</p>
@@ -1660,7 +1683,7 @@ const SellPage = () => {
                   onClick={() => {
                     if (window.confirm('Are you sure you want to delete this listing?')) {
                       deleteListing(listing.id);
-                      navigate('/');
+                      navigate('/market');
                     }
                   }}
                   className="flex-1 py-4 border-2 border-red-500 text-red-500 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-50"
@@ -1754,6 +1777,24 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const unsubscribe = onSnapshot(userRef, async (snap) => {
       if (snap.exists()) {
         const data = snap.data();
+        const developerEmails = ['xeliboyydagents@gmail.com', 'axzelbaril460@gmail.com'];
+        
+        // Auto-promote developers to sellers for testing
+        if (fbUser.email && developerEmails.includes(fbUser.email.toLowerCase())) {
+          if (data.role !== 'seller' || data.verificationStatus !== 'approved' || !data.isVerified) {
+            console.log("Auto-promoting developer to seller role...");
+            const promoData = {
+              role: 'seller',
+              isVerified: true,
+              verificationStatus: 'approved'
+            };
+            await updateDoc(userRef, promoData);
+            syncUserProfileToSupabase(fbUser.uid, { ...data, ...promoData });
+            // The next snapshot will handle setting the user state
+            return;
+          }
+        }
+
         setUser({ 
           ...data, 
           role: typeof data.role === 'string' ? data.role.trim() : data.role,
@@ -1773,6 +1814,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
           createdAt: serverTimestamp()
         };
         await setDoc(userRef, profileData);
+        syncUserProfileToSupabase(fbUser.uid, profileData);
       }
       setLoading(false);
     }, (err) => {
@@ -1939,7 +1981,10 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const userRef = doc(db, 'users', user.id);
       await updateDoc(userRef, data);
-      setUser({ ...user, ...data });
+      const updatedUser = { ...user, ...data };
+      setUser(updatedUser);
+      // Sync to Supabase
+      syncUserProfileToSupabase(user.id, updatedUser);
     } catch (error) {
       handleFirestoreError(error, 'update', `users/${user.id}`);
     }
@@ -1973,6 +2018,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
         images: imageUrls,
         sellerId: user.id,
         sellerName: user.fullName,
+        sellerAvatar: user.avatarUrl || '',
         sellerRating: 4.8, 
         status: 'active',
         views: 0,
@@ -1992,6 +2038,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
               category: data.category,
               seller_id: user.id,
               seller_name: user.fullName,
+              seller_avatar: user.avatarUrl || '',
               status: 'active',
               description: data.description,
               image_url: imageUrls[0], // Main thumbnail
@@ -2190,13 +2237,22 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     alert("Review reported to campus moderators.");
   };
 
-  const submitSellerApplication = async (data: Omit<SellerApplication, 'userId' | 'status' | 'createdAt'>) => {
+  const submitSellerApplication = async (data: Omit<SellerApplication, 'userId' | 'status' | 'createdAt'>, idFile?: File) => {
     if (!user) return;
     try {
+      let photoURL = data.photoURL;
+      
+      if (idFile) {
+        addNotification("Compressing and uploading student ID...", "info");
+        const compressed = await compressImage(idFile);
+        photoURL = await uploadStudentId(compressed, user.id);
+      }
+
       // 1. Save to sellerApplications collection as requested
       const appRef = doc(db, 'sellerApplications', user.id);
       await setDoc(appRef, {
         ...data,
+        photoURL,
         userId: user.id,
         status: 'pending',
         createdAt: serverTimestamp()

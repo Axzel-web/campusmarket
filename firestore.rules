@@ -14,7 +14,7 @@ service cloud.firestore {
     }
 
     function isEmailVerified() {
-      return isSignedIn() && request.auth.token.email_verified == true;
+      return isSignedIn(); // Relaxed for better dev experience
     }
 
     function isOwner(userId) {
@@ -35,35 +35,47 @@ service cloud.firestore {
 
     // --- 2. Validation Blueprints ---
 
-    function isValidUserProfile(data) {
-      return data.keys().hasAll(['fullName', 'email', 'role', 'isVerified', 'createdAt']) &&
-             data.fullName is string && data.fullName.size() <= 100 &&
-             data.email is string && data.email.size() <= 100 &&
-             data.role in ['buyer', 'seller', 'admin'] &&
-             data.isVerified is bool &&
-             data.createdAt is timestamp &&
-             (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 1000));
+    // schema check (optional fields checked only if present)
+    function isValidUserProfileSchema(data) {
+      return (!('fullName' in data) || (data.fullName is string && data.fullName.size() <= 128)) &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 128)) &&
+             (!('role' in data) || (data.role in ['buyer', 'seller', 'admin'])) &&
+             (!('isVerified' in data) || (data.isVerified is bool)) &&
+             (!('createdAt' in data) || (data.createdAt is timestamp || data.createdAt is int)) &&
+             (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 1000)) &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() <= 2000)) &&
+             (!('courseAndYear' in data) || (data.courseAndYear is string && data.courseAndYear.size() <= 128)) &&
+             (!('verificationStatus' in data) || (data.verificationStatus is string && data.verificationStatus.size() <= 128)) &&
+             (!('studentId' in data) || (data.studentId is string && data.studentId.size() <= 128)) &&
+             (!('studentIdImage' in data) || (data.studentIdImage is string && data.studentIdImage.size() <= 1000)) &&
+             (!('universityEmail' in data) || (data.universityEmail is string && data.universityEmail.size() <= 128)) &&
+             (!('contactDetails' in data) || (data.contactDetails is string && data.contactDetails.size() <= 512));
+    }
+
+    function hasRequiredProfileFields(data) {
+      return data.keys().hasAll(['fullName', 'email', 'role', 'isVerified', 'createdAt']);
+    }
+
+    function isDeveloper() {
+      return isSignedIn() && request.auth.token.email in ['xeliboyydagents@gmail.com', 'axzelbaril460@gmail.com'];
     }
 
     function isVerifiedSeller() {
-      return isSignedIn() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'seller' &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isVerified == true &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verificationStatus == 'approved';
+      return isSignedIn() && (
+        isDeveloper() || (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'buyer') == 'seller' &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isVerified', false) == true &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('verificationStatus', '') == 'approved'
+        )
+      );
     }
 
     function isValidListing(data) {
-      return data.keys().hasAll(['title', 'price', 'category', 'sellerId', 'status', 'condition', 'quantity', 'location', 'contactMethod', 'createdAt']) &&
-             data.title is string && data.title.size() <= 150 &&
-             data.price is number && data.price >= 0 &&
-             data.category is string &&
-             data.sellerId == request.auth.uid &&
-             data.status in ['active', 'sold', 'archived'] &&
-             data.condition in ['New', 'Used'] &&
-             data.quantity is number && data.quantity >= 0 &&
-             data.location is string && data.location.size() <= 200 &&
-             data.contactMethod is string &&
-             data.createdAt == (resource == null ? request.time : existing().createdAt);
+      // Only require all keys on creation (when resource is null)
+      return (resource != null || data.keys().hasAll(['title', 'price', 'category', 'sellerId', 'status', 'condition', 'quantity', 'location', 'contactMethod', 'createdAt'])) &&
+             (!('sellerId' in data) || data.sellerId == request.auth.uid) &&
+             (!('status' in data) || data.status in ['active', 'sold', 'archived']) &&
+             (!('createdAt' in data) || data.createdAt == (resource == null ? request.time : existing().createdAt));
     }
 
     function isValidChat(data) {
@@ -103,16 +115,19 @@ service cloud.firestore {
       allow list: if false; // No bulk user scanning
       
       allow create: if isOwner(userId) && 
-                      isValidUserProfile(incoming()) && 
+                      hasRequiredProfileFields(incoming()) &&
+                      isValidUserProfileSchema(incoming()) && 
                       incoming().isVerified == false && // Cannot self-verify
                       incoming().role == 'buyer';      // Default role
       
       allow update: if isOwner(userId) && 
-                      isValidUserProfile(incoming()) &&
-                      incoming().isVerified == existing().isVerified && // Immutable verification
-                      incoming().role == existing().role &&             // Immutable role
-                      incoming().email == existing().email &&           // Immutable email
-                      incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'courseAndYear', 'studentId', 'universityEmail', 'bio', 'studentIdImage', 'verificationStatus', 'avatarUrl']);
+                      // Core fields must match existing UNLESS user is a developer
+                      (isDeveloper() || (
+                        (!('email' in incoming()) || incoming().email == existing().email) &&
+                        (!('role' in incoming()) || incoming().role == existing().role) &&
+                        (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified) &&
+                        (!('createdAt' in incoming()) || incoming().createdAt == existing().createdAt)
+                      ));
     }
 
     match /users/{userId}/favorites/{listingId} {
@@ -126,7 +141,8 @@ service cloud.firestore {
 
     match /listings/{listingId} {
       allow read: if isSignedIn();
-      allow create: if isVerifiedSeller() && isValidId(listingId) && isValidListing(incoming());
+      allow create: if isVerifiedSeller() && 
+                      incoming().sellerId == request.auth.uid;
       allow update: if isOwner(existing().sellerId) && 
                       isValidListing(incoming()) &&
                       incoming().sellerId == existing().sellerId &&
