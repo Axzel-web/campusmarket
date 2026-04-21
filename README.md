@@ -6,7 +6,7 @@ This project has been adapted for deployment on Vercel.
 
 1.  **Framework Preset**: Ensure "Vite" is selected as the Framework Preset in your Vercel project settings.
 2.  **Environment Variables**: Add the following Environment Variables in the Vercel Dashboard:
-    *   `GEMINI_API_KEY`: Your Google AI API key (from Google AI Studio).
+    *   `GEMINI_API_KEY`: Your Google AI API key.
     *   `VITE_APP_URL`: Your Vercel deployment URL (e.g., `https://campusmarket.vercel.app`).
 3.  **Routing**: A `vercel.json` has been added to handle Single Page Application (SPA) routing. This ensures that deep links (like `/market` or `/profile`) work correctly when refreshed.
 
