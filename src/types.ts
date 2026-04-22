@@ -54,6 +54,7 @@ export interface Chat {
   lastMessageAt?: any; // Timestamp or number
   listingId: string;
   listingTitle: string;
+  sellerName?: string;
 }
 
 export interface Favorite {

@@ -79,10 +79,21 @@ const HomeBackground = () => {
     surfaceImperfection.wrapT = THREE.RepeatWrapping;
     surfaceImperfection.wrapS = THREE.RepeatWrapping;
 
-    const hands_mat = new THREE.MeshPhysicalMaterial({
-      color: 0x606060,
-      roughness: 0.2,
-      metalness: 1,
+    const mint_mat = new THREE.MeshPhysicalMaterial({
+      color: 0x3FFFB2,
+      emissive: 0x3FFFB2,
+      emissiveIntensity: 1.5,
+      roughness: 0.1,
+      metalness: 0.2,
+      roughnessMap: surfaceImperfection,
+      envMap: hdrEquirect,
+      envMapIntensity: 2
+    });
+
+    const black_mat = new THREE.MeshPhysicalMaterial({
+      color: 0x010101,
+      roughness: 0.1,
+      metalness: 0.8,
       roughnessMap: surfaceImperfection,
       envMap: hdrEquirect,
       envMapIntensity: 1.5
@@ -92,9 +103,11 @@ const HomeBackground = () => {
     fbxloader.load(
       "https://miroleon.github.io/daily-assets/two_hands_01.fbx",
       function (object) {
+        let meshCount = 0;
         object.traverse(function (child) {
           if ((child as THREE.Mesh).isMesh) {
-            (child as THREE.Mesh).material = hands_mat;
+            (child as THREE.Mesh).material = (meshCount % 2 === 0) ? black_mat : mint_mat;
+            meshCount++;
           }
         });
         object.position.set(0, 0, 0);
@@ -683,8 +696,44 @@ export const LandingPage: React.FC = () => {
         }
 
         .nav-links {
-          display: flex;
-          gap: 2.5rem;
+          display: flex !important;
+          flex-direction: row !important;
+          gap: 2rem !important;
+          align-items: center;
+        }
+
+        .nav-links a {
+          white-space: nowrap;
+          text-decoration: none;
+          color: black;
+          font-size: 11px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.15em;
+          opacity: 0.5;
+          transition: all 0.3s;
+          font-family: 'Inter', sans-serif;
+          position: relative;
+          display: block;
+        }
+
+        .nav-links a::after {
+          content: '';
+          position: absolute;
+          bottom: -4px;
+          left: 0;
+          width: 0;
+          height: 1.5px;
+          background: black;
+          transition: width 0.3s;
+        }
+
+        .nav-links a:hover {
+          opacity: 1;
+        }
+        
+        .nav-links a:hover::after {
+          width: 100%;
         }
 
         @media screen and (max-width: 768px) {
@@ -762,38 +811,6 @@ export const LandingPage: React.FC = () => {
 
         @media screen and (max-width: 768px) {
            .mobile-toggle { display: block; }
-        }
-
-        .nav-links a {
-          text-decoration: none;
-          color: black;
-          font-size: 13px;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 0.15em;
-          opacity: 0.5;
-          transition: all 0.3s;
-          font-family: 'Inter', sans-serif;
-          position: relative;
-        }
-
-        .nav-links a::after {
-          content: '';
-          position: absolute;
-          bottom: -4px;
-          left: 0;
-          width: 0;
-          height: 1.5px;
-          background: black;
-          transition: width 0.3s;
-        }
-
-        .nav-links a:hover {
-          opacity: 1;
-        }
-        
-        .nav-links a:hover::after {
-          width: 100%;
         }
 
         /* New Sections */
@@ -981,7 +998,7 @@ export const LandingPage: React.FC = () => {
 
       {/* NAVIGATION BAR */}
       <nav className="landing-nav">
-        <Link to="/" className="text-base font-black tracking-tighter" style={{ textDecoration: 'none' }}>CAMPUSMARKET.</Link>
+        <Link to="/" className="text-base font-black tracking-tighter" style={{ textDecoration: 'none', color: '#00332c', alignSelf: 'center' }}>CAMPUSMARKET.</Link>
         <div className="nav-links">
           <a href="#home">Home</a>
           <a href="#about">About</a>

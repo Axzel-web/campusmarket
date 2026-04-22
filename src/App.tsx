@@ -254,18 +254,60 @@ const Sidebar = () => {
       </nav>
 
       <div className="campus-gradient p-4 rounded-xl text-white mt-auto">
-        <p className="font-bold text-sm mb-1">📍 Plsp University</p>
+        <p className="font-bold text-sm mb-1">📍 Campus University</p>
         <p className="text-[10px] opacity-80 font-medium">Verified Campus Only Environment</p>
       </div>
     </aside>
   );
 };
 
+const RecentChatItem = ({ chat, currentUserId }: { chat: Chat, currentUserId: string }) => {
+  const [partnerName, setPartnerName] = useState<string>(chat.sellerName || chat.listingTitle);
+
+  useEffect(() => {
+    const partnerId = chat.participants.find(p => p !== currentUserId);
+    if (partnerId) {
+      getDoc(doc(db, 'users', partnerId)).then(snap => {
+        if (snap.exists()) {
+          setPartnerName(snap.data().fullName);
+        }
+      });
+    }
+  }, [chat, currentUserId]);
+
+  return (
+    <Link 
+      to={`/chat/${chat.id}`}
+      className="flex items-center gap-3 group cursor-pointer hover:bg-bg-light p-1 rounded-lg transition-colors"
+    >
+      <div className="w-8 h-8 rounded-xl bg-accent-subtle flex-shrink-0 flex items-center justify-center text-brand-primary font-bold text-[10px] border border-border-main">
+        {partnerName[0]}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold text-text-main group-hover:text-brand-primary transition-colors truncate leading-tight">
+          {partnerName}
+        </p>
+        <p className="text-[9px] text-text-muted truncate font-medium">
+          {chat.listingTitle}
+        </p>
+      </div>
+    </Link>
+  );
+};
+
 const RightPanel = () => {
-  const { user, listings, setAiDraft, addNotification } = useApp();
+  const { user, listings, setAiDraft, addNotification, chats } = useApp();
   const navigate = useNavigate();
   const [quickDesc, setQuickDesc] = useState('');
   const [generating, setGenerating] = useState(false);
+
+  const recentChats = [...chats]
+    .sort((a, b) => {
+      const timeA = a.lastMessageAt?.toMillis ? a.lastMessageAt.toMillis() : (a.lastMessageAt || 0);
+      const timeB = b.lastMessageAt?.toMillis ? b.lastMessageAt.toMillis() : (b.lastMessageAt || 0);
+      return timeB - timeA;
+    })
+    .slice(0, 3);
 
   const handleGenerateAI = async () => {
     if (!quickDesc.trim()) {
@@ -296,42 +338,6 @@ const RightPanel = () => {
 
   return (
     <aside className="w-[300px] bg-white border-l border-border-main p-6 sticky top-16 h-[calc(100vh-64px)] hidden lg:flex flex-col gap-6 overflow-y-auto flex-shrink-0 no-scrollbar">
-      {/* AI Assistant Widget */}
-      <div className="bg-accent-subtle border border-dashed border-brand-primary rounded-2xl p-4 relative overflow-hidden group">
-        <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
-          <Sparkles size={40} className="text-brand-primary" />
-        </div>
-        <h3 className="text-[11px] font-black text-brand-primary uppercase tracking-widest mb-3 flex items-center gap-1.5 font-sans relative z-10">
-          <Sparkles size={14} className="animate-pulse" /> AI Listing Assistant
-        </h3>
-        <div className="space-y-3 relative z-10">
-          <div>
-            <label className="text-[10px] font-black text-text-muted uppercase tracking-wider mb-1.5 block ml-1">Quick Description</label>
-            <textarea 
-              placeholder="e.g. used iPad Pro 2022, silver, apple pencil included..."
-              value={quickDesc}
-              onChange={(e) => setQuickDesc(e.target.value)}
-              className="w-full h-20 p-3 bg-white rounded-xl border border-border-main text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all resize-none shadow-inner"
-            />
-          </div>
-          <button 
-            onClick={handleGenerateAI}
-            disabled={generating}
-            className="w-full py-2.5 bg-brand-primary text-white text-xs font-black rounded-xl hover:bg-brand-primary-hover active:scale-[0.98] transition-all shadow-lg shadow-brand-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {generating ? (
-              <>
-                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Generating...
-              </>
-            ) : (
-              <>Help me list this Item</>
-            )}
-          </button>
-          <p className="text-[9px] text-text-muted font-bold text-center italic opacity-60">AI will generate title, price & tags</p>
-        </div>
-      </div>
-
       {/* Seller Hub / Verification Widget */}
       <div className={cn(
         "rounded-xl p-4 border",
@@ -381,7 +387,7 @@ const RightPanel = () => {
             <div className="flex items-center gap-2 text-xs font-medium text-text-main">
               <span className="w-2 h-2 rounded-full bg-brand-primary"></span> Ready to sell?
             </div>
-            <p className="text-[11px] text-text-muted">Complete verification to start posting items to Plsp University.</p>
+            <p className="text-[11px] text-text-muted">Complete verification to start posting items to Campus University.</p>
             <button 
               onClick={() => navigate('/verify')}
               className="w-full py-2 border border-border-main text-xs font-bold rounded-lg hover:bg-bg-light transition-colors mt-2"
@@ -393,15 +399,20 @@ const RightPanel = () => {
       </div>
 
       {/* Recently Messaged Widget */}
-      <div className="mt-auto pt-6 border-t border-border-main">
-         <h3 className="text-[11px] font-bold text-text-muted uppercase tracking-widest mb-3 font-sans">
-          Recently Messaged
-        </h3>
-        <div className="flex items-center gap-3 group cursor-pointer">
-          <div className="w-8 h-8 rounded-full bg-accent-subtle flex items-center justify-center text-brand-primary font-bold text-[10px]">AS</div>
-          <p className="text-[11px] font-medium text-text-main group-hover:text-brand-primary transition-colors">Alex Smith (Organic Chem Book)</p>
+      {user && recentChats.length > 0 && (
+        <div className="mt-auto pt-6 border-t border-border-main">
+          <h3 className="text-[11px] font-bold text-text-muted uppercase tracking-widest mb-4 font-sans">
+            Recently Messaged
+          </h3>
+            <div className="space-y-4">
+            {recentChats.map(chat => (
+              <div key={chat.id}>
+                <RecentChatItem chat={chat} currentUserId={user.id} />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </aside>
   );
 };
@@ -1174,6 +1185,113 @@ const ProfilePage = () => {
       </div>
     </div>
   );
+};
+
+const PublicProfilePage = () => {
+    const { id } = useParams<{ id: string }>();
+    const { listings, user: currentUser } = useApp();
+    const [seller, setSeller] = useState<UserProfile | null>(null);
+    const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (!id) return;
+        setLoading(true);
+        const fetchSeller = async () => {
+            try {
+                const docRef = doc(db, 'users', id);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    setSeller({ ...snap.data(), id: snap.id } as UserProfile);
+                }
+            } catch (err) {
+                console.error("Error fetching seller profile:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchSeller();
+    }, [id]);
+
+    if (loading) return <div className="p-20 text-center text-text-muted">Loading profile...</div>;
+    if (!seller) return <div className="p-20 text-center text-text-muted">User not found.</div>;
+
+    const sellerListings = listings.filter(l => l.sellerId === seller.id);
+
+    return (
+        <div className="flex-1 px-4 py-8 overflow-y-auto no-scrollbar bg-[#f8fafc]">
+            <div className="max-w-3xl mx-auto space-y-6 pb-20">
+                <button onClick={() => navigate(-1)} className="p-2 bg-white rounded-xl border border-border-main hover:bg-bg-light transition-colors mb-2 inline-flex items-center gap-2 text-sm font-medium">
+                    <ArrowLeft size={18} /> Back
+                </button>
+
+                <div className="bg-white rounded-[32px] overflow-hidden border border-border-main shadow-sm relative">
+                    <div className="h-24 bg-gradient-to-r from-brand-primary to-emerald-400 opacity-90"></div>
+                    <div className="px-8 pb-8">
+                        <div className="relative flex flex-col md:flex-row items-center md:items-end gap-6 -mt-12 mb-6">
+                            <div className="w-28 h-28 rounded-3xl bg-white p-1 shadow-xl relative z-10 overflow-hidden">
+                                <div className="w-full h-full rounded-2xl bg-accent-subtle border-4 border-white flex items-center justify-center text-brand-primary text-4xl font-black">
+                                    {seller.avatarUrl ? (
+                                        <img src={seller.avatarUrl} alt={seller.fullName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    ) : (
+                                        seller.fullName[0]
+                                    )}
+                                </div>
+                                {seller.isVerified && (
+                                    <div className="absolute -bottom-1 -right-1 bg-brand-primary text-white p-1.5 rounded-full border-4 border-white shadow-lg z-20">
+                                        <ShieldCheck size={14} fill="currentColor" />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex-1 text-center md:text-left pb-2">
+                                <h2 className="text-2xl font-black text-text-main">
+                                    {seller.fullName}
+                                </h2>
+                                <p className="text-text-muted text-sm font-bold flex items-center justify-center md:justify-start gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-brand-primary"></span>
+                                    {seller.courseAndYear || 'Verified Student'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {seller.bio && (
+                            <div className="mb-8 p-4 bg-bg-light rounded-2xl border border-border-main text-sm text-text-main italic">
+                                "{seller.bio}"
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-4 rounded-2xl border border-border-main bg-white">
+                                <p className="text-lg font-black text-text-main">{sellerListings.length}</p>
+                                <p className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Active Listings</p>
+                            </div>
+                            <div className="p-4 rounded-2xl border border-border-main bg-white">
+                                <p className="text-lg font-black text-text-main">5.0</p>
+                                <p className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Seller Rating</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 className="text-lg font-bold text-text-main mb-4">Store Listings</h3>
+                    {sellerListings.length > 0 ? (
+                        <div className="grid grid-cols-2 lg:grid-cols-2 gap-4">
+                            {sellerListings.map(listing => (
+                                <div key={listing.id}>
+                                    <ListingCard listing={listing} />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-border-main text-text-muted text-sm">
+                            No active listings from this seller yet.
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 };
 
 const VerificationPage = () => {
@@ -2249,6 +2367,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
         participants: [user.id, listing.sellerId],
         listingId: listing.id,
         listingTitle: listing.title,
+        sellerName: listing.sellerName,
         lastMessage: 'Started a chat',
         lastMessageAt: serverTimestamp()
       });
@@ -2372,9 +2491,20 @@ const ChatPage = () => {
     const [text, setText] = useState('');
     const chat = chats.find(c => c.id === id);
     const navigate = useNavigate();
+    const [partner, setPartner] = useState<UserProfile | null>(null);
 
     useEffect(() => {
-        if (!id) return;
+        if (!id || !chat || !user) return;
+        
+        const partnerId = chat.participants.find(p => p !== user.id);
+        if (partnerId) {
+            getDoc(doc(db, 'users', partnerId)).then(snap => {
+                if (snap.exists()) {
+                    setPartner({ ...snap.data(), id: snap.id } as UserProfile);
+                }
+            });
+        }
+
         const q = query(collection(db, 'chats', id, 'messages'), orderBy('createdAt', 'asc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(d => ({ 
@@ -2385,20 +2515,27 @@ const ChatPage = () => {
             setMessages(data);
         });
         return unsubscribe;
-    }, [id]);
+    }, [id, chat, user]);
 
     if (!chat || !user) return null;
 
     return (
         <div className="h-screen flex flex-col bg-white">
-            <div className="p-4 border-b flex items-center gap-4">
-                <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-400 hover:text-slate-600">
-                    <ArrowLeft size={24} />
-                </button>
-                <div>
-                   <h2 className="font-bold text-slate-800">{chat.listingTitle}</h2>
-                   <p className="text-xs text-slate-500">Messaging Seller</p>
+            <div className="p-4 border-b flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-400 hover:text-slate-600">
+                        <ArrowLeft size={24} />
+                    </button>
+                    <div>
+                    <h2 className="font-bold text-slate-800">{partner?.fullName || chat.sellerName || 'Chat'}</h2>
+                    <p className="text-xs text-slate-500">{chat.listingTitle}</p>
+                    </div>
                 </div>
+                {partner && (
+                    <Link to={`/profile/${partner.id}`} className="text-brand-primary font-bold text-xs hover:underline bg-accent-subtle px-3 py-1.5 rounded-lg transition-colors">
+                        View Profile
+                    </Link>
+                )}
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -2453,6 +2590,41 @@ const SellerDashboardPage = () => {
   );
 };
 
+const ChatItem = ({ chat, currentUserId }: { chat: Chat, currentUserId: string }) => {
+    const [partnerName, setPartnerName] = useState<string>(chat.sellerName || chat.listingTitle);
+
+    useEffect(() => {
+        // If we don't have a specific sellerName or if we want to ensure we show the partner's name
+        // (whether they are the buyer or seller), we fetch it based on the participant list.
+        const partnerId = chat.participants.find(p => p !== currentUserId);
+        if (partnerId) {
+            getDoc(doc(db, 'users', partnerId)).then(snap => {
+                if (snap.exists()) {
+                    setPartnerName(snap.data().fullName);
+                }
+            });
+        }
+    }, [chat, currentUserId]);
+
+    return (
+        <Link 
+            to={`/chat/${chat.id}`}
+            className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-border-main shadow-sm hover:border-brand-primary active:scale-[0.98] transition-all"
+        >
+            <div className="w-12 h-12 rounded-xl bg-accent-subtle flex items-center justify-center text-brand-primary font-bold border border-border-main">
+                {partnerName[0]}
+            </div>
+            <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-text-main truncate">{partnerName}</h3>
+                <p className="text-[13px] text-text-muted truncate font-medium">{chat.lastMessage}</p>
+            </div>
+            <span className="text-[10px] text-text-muted font-bold whitespace-nowrap">
+                {new Date(chat.lastMessageAt || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+        </Link>
+    );
+};
+
 const MessagesListPage = () => {
     const { chats, user } = useApp();
     if (!user) return null;
@@ -2468,22 +2640,9 @@ const MessagesListPage = () => {
                     </div>
                 ) : (
                     chats.map(chat => (
-                        <Link 
-                            key={chat.id} 
-                            to={`/chat/${chat.id}`}
-                            className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-border-main shadow-sm hover:border-brand-primary active:scale-[0.98] transition-all"
-                        >
-                            <div className="w-12 h-12 rounded-xl bg-accent-subtle flex items-center justify-center text-brand-primary font-bold border border-border-main">
-                                {chat.listingTitle[0]}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-text-main truncate">{chat.listingTitle}</h3>
-                                <p className="text-[13px] text-text-muted truncate font-medium">{chat.lastMessage}</p>
-                            </div>
-                            <span className="text-[10px] text-text-muted font-bold whitespace-nowrap">
-                                {new Date(chat.lastMessageAt || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                        </Link>
+                        <div key={chat.id}>
+                            <ChatItem chat={chat} currentUserId={user.id} />
+                        </div>
                     ))
                 )}
             </div>
@@ -2575,6 +2734,7 @@ const AppContent = () => {
                             <Route path="/favorites" element={<FavoritesPage />} />
                             <Route path="/sell" element={<SellPage />} />
                             <Route path="/profile" element={<ProfilePage />} />
+                            <Route path="/profile/:id" element={<PublicProfilePage />} />
                             <Route path="/verify" element={<VerificationPage />} />
                             <Route path="/listing/:id" element={<ListingDetail />} />
                             <Route path="/chat/:id" element={<ChatPage />} />
