@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
  */
 
 export const uploadUserMedia = async (file: File | Blob, userId: string, folder: 'avatars' | 'identities'): Promise<string> => {
-  if (!supabase) throw new Error('Supabase not connected');
+  if (!supabase) throw new Error('Supabase not connected. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment variables.');
 
   const fileExt = 'jpg';
   const fileName = `${folder}/${userId}-${Date.now()}.${fileExt}`;

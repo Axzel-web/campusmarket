@@ -132,7 +132,7 @@ export const subscribeToProducts = (callback: (payload: any) => void) => {
 
 // 8. Storage: Upload Product Image to Supabase
 export const uploadProductImage = async (file: File | Blob, userId: string): Promise<string> => {
-  if (!supabase) throw new Error('Supabase not connected');
+  if (!supabase) throw new Error('Supabase not connected. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment variables.');
 
   const fileExt = 'jpg'; // We usually compress to jpg
   const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;

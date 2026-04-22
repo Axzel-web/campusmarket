@@ -145,6 +145,8 @@ interface AppContextType {
   removeNotification: (id: string) => void;
   addNotification: (message: string, type: 'info' | 'success' | 'error') => void;
   isSupabaseConnected: boolean;
+  aiDraft: any | null;
+  setAiDraft: (draft: any | null) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -260,30 +262,73 @@ const Sidebar = () => {
 };
 
 const RightPanel = () => {
-  const { user, listings } = useApp();
+  const { user, listings, setAiDraft, addNotification } = useApp();
   const navigate = useNavigate();
+  const [quickDesc, setQuickDesc] = useState('');
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerateAI = async () => {
+    if (!quickDesc.trim()) {
+      addNotification("Please enter a short description first.", "info");
+      return;
+    }
+
+    if (quickDesc.length < 5) {
+      addNotification("Please provide a bit more detail (at least 5 characters).", "info");
+      return;
+    }
+
+    setGenerating(true);
+    addNotification("AI is crafting your listing...", "info");
+    
+    try {
+      const draft = await generateListingDetails(quickDesc);
+      setAiDraft(draft);
+      addNotification("Listing details generated! Redirecting...", "success");
+      navigate('/sell');
+    } catch (error) {
+      console.error(error);
+      addNotification("AI Assistant is busy right now. Please try again or list manually.", "error");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
-    <aside className="w-[300px] bg-white border-l border-border-main p-6 sticky top-16 h-[calc(100vh-64px)] hidden lg:flex flex-col gap-6 overflow-y-auto flex-shrink-0">
+    <aside className="w-[300px] bg-white border-l border-border-main p-6 sticky top-16 h-[calc(100vh-64px)] hidden lg:flex flex-col gap-6 overflow-y-auto flex-shrink-0 no-scrollbar">
       {/* AI Assistant Widget */}
-      <div className="bg-accent-subtle border border-dashed border-brand-primary rounded-xl p-4">
-        <h3 className="text-[11px] font-bold text-text-muted uppercase tracking-widest mb-3 flex items-center gap-1.5 font-sans">
-          <Sparkles size={14} className="text-brand-primary" /> AI Listing Assistant
+      <div className="bg-accent-subtle border border-dashed border-brand-primary rounded-2xl p-4 relative overflow-hidden group">
+        <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+          <Sparkles size={40} className="text-brand-primary" />
+        </div>
+        <h3 className="text-[11px] font-black text-brand-primary uppercase tracking-widest mb-3 flex items-center gap-1.5 font-sans relative z-10">
+          <Sparkles size={14} className="animate-pulse" /> AI Listing Assistant
         </h3>
-        <div className="space-y-3">
+        <div className="space-y-3 relative z-10">
           <div>
-            <label className="text-[10px] font-bold text-text-muted uppercase mb-1 block">Quick Description</label>
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-wider mb-1.5 block ml-1">Quick Description</label>
             <textarea 
-              placeholder="e.g. used iPad Pro, good condition..."
-              className="w-full h-16 p-2 bg-white rounded-lg border border-border-main text-xs focus:outline-none focus:border-brand-primary"
+              placeholder="e.g. used iPad Pro 2022, silver, apple pencil included..."
+              value={quickDesc}
+              onChange={(e) => setQuickDesc(e.target.value)}
+              className="w-full h-20 p-3 bg-white rounded-xl border border-border-main text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all resize-none shadow-inner"
             />
           </div>
           <button 
-            onClick={() => navigate('/sell')}
-            className="w-full py-2 bg-brand-primary text-white text-xs font-bold rounded-lg hover:bg-brand-primary-hover transition-colors shadow-sm"
+            onClick={handleGenerateAI}
+            disabled={generating}
+            className="w-full py-2.5 bg-brand-primary text-white text-xs font-black rounded-xl hover:bg-brand-primary-hover active:scale-[0.98] transition-all shadow-lg shadow-brand-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Go to Seller Hub
+            {generating ? (
+              <>
+                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Generating...
+              </>
+            ) : (
+              <>Help me list this Item</>
+            )}
           </button>
+          <p className="text-[9px] text-text-muted font-bold text-center italic opacity-60">AI will generate title, price & tags</p>
         </div>
       </div>
 
@@ -1102,6 +1147,29 @@ const ProfilePage = () => {
               </Link>
             ))}
           </div>
+
+          {/* Developer Reset - Hidden for normal users */}
+          {['xeliboyydagents@gmail.com', 'axzelbaril460@gmail.com'].includes(user.email.toLowerCase()) && (
+            <div className="mt-8 pt-6 border-t border-dashed border-border-main flex flex-col items-center gap-3">
+              <p className="text-[9px] font-black text-text-muted uppercase tracking-[0.2em]">Developer Environment</p>
+              <button 
+                onClick={async () => {
+                   if (window.confirm('Reset your verification status for testing?')) {
+                     await updateProfile({ 
+                       role: 'buyer', 
+                       isVerified: false, 
+                       verificationStatus: 'none' 
+                     });
+                     addNotification('Account reset for verification testing.', 'info');
+                     navigate('/verify');
+                   }
+                }}
+                className="px-6 py-2.5 bg-red-50 text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-red-100 hover:bg-red-100 active:scale-95 transition-all shadow-sm"
+              >
+                Reset Verification Status
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1325,7 +1393,7 @@ const VerificationPage = () => {
 };
 
 const SellPage = () => {
-  const { user, addListing } = useApp();
+  const { user, addListing, aiDraft, setAiDraft } = useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -1341,6 +1409,21 @@ const SellPage = () => {
     contactMethod: '',
     tags: [] as string[]
   });
+
+  useEffect(() => {
+    if (aiDraft) {
+      setFormData(prev => ({
+        ...prev,
+        title: aiDraft.title || prev.title,
+        price: aiDraft.suggestedPrice?.toString() || prev.price,
+        description: aiDraft.description || prev.description,
+        category: aiDraft.category || prev.category,
+        tags: aiDraft.tags || prev.tags
+      }));
+      // Clear the draft after using it
+      setAiDraft(null);
+    }
+  }, [aiDraft, setAiDraft]);
 
   const isApprovedSeller = user?.role === 'seller' && user?.verificationStatus === 'approved';
 
@@ -1728,6 +1811,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [listingsLoading, setListingsLoading] = useState(true);
+  const [aiDraft, setAiDraft] = useState<any | null>(null);
   const [notifications, setNotifications] = useState<{id: string, message: string, type: 'info' | 'success' | 'error'}[]>([]);
 
   const addNotification = (message: string, type: 'info' | 'success' | 'error') => {
@@ -1777,24 +1861,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const unsubscribe = onSnapshot(userRef, async (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        const developerEmails = ['xeliboyydagents@gmail.com', 'axzelbaril460@gmail.com'];
         
-        // Auto-promote developers to sellers for testing
-        if (fbUser.email && developerEmails.includes(fbUser.email.toLowerCase())) {
-          if (data.role !== 'seller' || data.verificationStatus !== 'approved' || !data.isVerified) {
-            console.log("Auto-promoting developer to seller role...");
-            const promoData = {
-              role: 'seller',
-              isVerified: true,
-              verificationStatus: 'approved'
-            };
-            await updateDoc(userRef, promoData);
-            syncUserProfileToSupabase(fbUser.uid, { ...data, ...promoData });
-            // The next snapshot will handle setting the user state
-            return;
-          }
-        }
-
         setUser({ 
           ...data, 
           role: typeof data.role === 'string' ? data.role.trim() : data.role,
@@ -2285,7 +2352,9 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
       replyToReview, archiveReview, reportReview,
       sellerApplication, submitSellerApplication,
       notifications, addNotification, removeNotification,
-      isSupabaseConnected
+      isSupabaseConnected,
+      aiDraft,
+      setAiDraft
     }}>
       {children}
     </AppContext.Provider>

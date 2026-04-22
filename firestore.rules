@@ -56,18 +56,11 @@ service cloud.firestore {
       return data.keys().hasAll(['fullName', 'email', 'role', 'isVerified', 'createdAt']);
     }
 
-    function isDeveloper() {
-      return isSignedIn() && request.auth.token.email in ['xeliboyydagents@gmail.com', 'axzelbaril460@gmail.com'];
-    }
-
     function isVerifiedSeller() {
-      return isSignedIn() && (
-        isDeveloper() || (
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'buyer') == 'seller' &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isVerified', false) == true &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('verificationStatus', '') == 'approved'
-        )
-      );
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'buyer') == 'seller' &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isVerified', false) == true &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('verificationStatus', '') == 'approved';
     }
 
     function isValidListing(data) {
@@ -121,13 +114,10 @@ service cloud.firestore {
                       incoming().role == 'buyer';      // Default role
       
       allow update: if isOwner(userId) && 
-                      // Core fields must match existing UNLESS user is a developer
-                      (isDeveloper() || (
-                        (!('email' in incoming()) || incoming().email == existing().email) &&
-                        (!('role' in incoming()) || incoming().role == existing().role) &&
-                        (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified) &&
-                        (!('createdAt' in incoming()) || incoming().createdAt == existing().createdAt)
-                      ));
+                      (!('email' in incoming()) || incoming().email == existing().email) &&
+                      (!('role' in incoming()) || incoming().role == existing().role) &&
+                      (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified) &&
+                      (!('createdAt' in incoming()) || incoming().createdAt == existing().createdAt);
     }
 
     match /users/{userId}/favorites/{listingId} {
