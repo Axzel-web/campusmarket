@@ -1,20 +1,15 @@
-# CampusMarket
+# 📌 CampusMarket – Cloud-Based Marketplace System
 
-CampusMarket is a web-based marketplace designed for students to buy and sell items within their campus community. It provides a simple and accessible platform for student transactions.
+## 📖 Description
+CampusMarket is a web-based marketplace platform designed for students to buy, sell, and browse items within the campus community. The system uses a modern cloud-based architecture that separates frontend, authentication, and database services for scalability, maintainability, and performance.
 
-## Features
+---
 
-- User authentication (login system)
-- Landing page
-- Marketplace for item listings
-- Create, edit, and delete listings
-- Search and filter items
-- Basic user interaction between buyers and sellers
-- Responsive design for mobile and desktop
+## ⚙️ System Architecture
 
-## Tech Stack
-
-- Backend: Firebase / Supabase
-- Database: Firebase / Supabase
-- Deployment: Vercel 
-
+```text
+User → Vercel (Frontend Hosting)
+         ↓
+   Firebase (Authentication / Storage)
+         ↓
+   Supabase (Database / API)
