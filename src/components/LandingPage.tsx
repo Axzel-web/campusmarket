@@ -31,14 +31,16 @@ const HomeBackground = () => {
   useEffect(() => {
     if (!canvasRef.current || !containerRef.current) return;
 
+    const isMobile = window.innerWidth < 768;
     const renderer = new THREE.WebGLRenderer({
       canvas: canvasRef.current,
-      antialias: true,
-      alpha: true
+      antialias: !isMobile,
+      alpha: true,
+      powerPreference: "high-performance"
     });
 
-    renderer.setClearColor(0x000000, 0); // Transparent background for the renderer
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setClearColor(0x000000, 0); 
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
     renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
 
     const scene = new THREE.Scene();
@@ -159,9 +161,13 @@ const HomeBackground = () => {
 
     const composer = new EffectComposer(renderer);
     composer.addPass(renderScene);
-    composer.addPass(afterimagePass);
-    composer.addPass(bloomPass);
-    composer.addPass(displacementPass);
+    
+    // Disable heavy effects on mobile for performance
+    if (!isMobile) {
+      composer.addPass(afterimagePass);
+      composer.addPass(bloomPass);
+      composer.addPass(displacementPass);
+    }
 
     function easeInOutCubic(x: number) {
       return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
@@ -244,7 +250,11 @@ const HomeBackground = () => {
       animationId = requestAnimationFrame(animate);
       controls.update();
       updateCamera();
-      composer.render();
+      if (!isMobile) {
+        composer.render();
+      } else {
+        renderer.render(scene, camera);
+      }
     };
 
     animate();
@@ -300,15 +310,17 @@ export const LandingPage: React.FC = () => {
           { bottom: 0, height: 0 }
         ];
 
+        const isMobile = window.innerWidth < 768;
         this.renderer = new THREE.WebGLRenderer({
-          antialias: true,
-          alpha: true
+          antialias: !isMobile,
+          alpha: true,
+          powerPreference: "high-performance"
         });
 
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.enabled = !isMobile;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
 
         // Apply visual properties directly as in CSS
         this.renderer.domElement.style.position = 'fixed';
@@ -660,6 +672,7 @@ export const LandingPage: React.FC = () => {
           right: 0;
           background: rgba(208, 203, 199, 0.95);
           backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
           z-index: 2000;
           display: flex;
           justify-content: space-between;
@@ -676,6 +689,9 @@ export const LandingPage: React.FC = () => {
 
         @media screen and (max-width: 768px) {
           .landing-nav {
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            background: rgb(208, 203, 199);
             padding: 1rem 1.5rem;
           }
           .nav-links {
@@ -690,8 +706,7 @@ export const LandingPage: React.FC = () => {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(208, 203, 199, 0.98);
-          backdrop-filter: blur(40px);
+          background: rgb(208, 203, 199);
           z-index: 3000;
           display: flex;
           flex-direction: column;
@@ -703,6 +718,15 @@ export const LandingPage: React.FC = () => {
           transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
           pointer-events: none;
           visibility: hidden;
+          will-change: transform;
+        }
+
+        @media screen and (min-width: 769px) {
+           .mobile-menu {
+              background: rgba(208, 203, 199, 0.98);
+              backdrop-filter: blur(40px);
+              -webkit-backdrop-filter: blur(40px);
+           }
         }
 
         .mobile-menu.open {
