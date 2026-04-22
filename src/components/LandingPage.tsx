@@ -259,8 +259,16 @@ const HomeBackground = () => {
     window.addEventListener("resize", onResize);
 
     let animationId: number;
+    let frameCount = 0;
     const animate = () => {
       animationId = requestAnimationFrame(animate);
+      
+      // Throttle Rendering on Mobile 
+      if (isMobile) {
+        frameCount++;
+        if (frameCount % 2 !== 0) return; 
+      }
+
       controls.update();
       updateCamera();
       if (!isMobile) {
@@ -690,16 +698,28 @@ export const LandingPage: React.FC = () => {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 0.8rem var(--padding);
+          padding: 0.8rem 1.5rem;
           border-bottom: 1px solid rgba(0,0,0,0.08);
           transition: all 0.3s ease;
         }
 
+        @media only screen and (min-width: 800px) {
+           .landing-nav {
+             padding: 0.8rem var(--padding);
+           }
+        }
+
         .nav-links {
-          display: flex !important;
-          flex-direction: row !important;
-          gap: 2rem !important;
+          display: none;
+          flex-direction: row;
+          gap: 2rem;
           align-items: center;
+        }
+
+        @media only screen and (min-width: 769px) {
+           .nav-links {
+             display: flex;
+           }
         }
 
         .nav-links a {
@@ -742,9 +762,6 @@ export const LandingPage: React.FC = () => {
             -webkit-backdrop-filter: none;
             background: rgb(208, 203, 199);
             padding: 1rem 1.5rem;
-          }
-          .nav-links {
-            display: none;
           }
         }
 
