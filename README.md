@@ -1,6 +1,6 @@
 # CampusMarket
 
-CampusMarket is a web-based marketplace designed for students to buy, sell, and trade items within their campus community. It provides a simple and accessible platform for student transactions.
+CampusMarket is a web-based marketplace designed for students to buy and sell items within their campus community. It provides a simple and accessible platform for student transactions.
 
 ## Features
 
