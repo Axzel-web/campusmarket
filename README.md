@@ -7,9 +7,10 @@ CampusMarket is a web-based marketplace platform designed for students to buy, s
 
 ## ⚙️ System Architecture
 
-```text
-User → Vercel (Frontend Hosting)
-         ↓
-   Firebase (Authentication / Storage)
-         ↓
-   Supabase (Database / API)
+User
+  ↓
+Vercel (Frontend UI Hosting)
+  ↓
+Firebase (Authentication + Seller Verification)
+  ↓
+Supabase (Database + Storage)
