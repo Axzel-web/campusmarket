@@ -6,12 +6,6 @@ The platform is built using a serverless architecture powered by Firebase and Su
 
 ---
 
-🌐 Live Demo
-
-🔗 https://campusmarket.vercel.app
-
----
-
 🎯 Project Objective
 
 The goal of Campus Market is to simulate a real-world e-commerce platform within a controlled campus environment. It aims to:
