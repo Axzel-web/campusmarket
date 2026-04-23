@@ -14,7 +14,7 @@ service cloud.firestore {
     }
 
     function isEmailVerified() {
-      return isSignedIn(); // Relaxed for better dev experience
+      return isSignedIn();
     }
 
     function isOwner(userId) {
@@ -41,6 +41,8 @@ service cloud.firestore {
              (!('email' in data) || (data.email is string && data.email.size() <= 128)) &&
              (!('role' in data) || (data.role in ['buyer', 'seller', 'admin'])) &&
              (!('isVerified' in data) || (data.isVerified is bool)) &&
+             (!('onboarded' in data) || (data.onboarded is bool)) &&
+             (!('interests' in data) || (data.interests is list)) &&
              (!('createdAt' in data) || (data.createdAt is timestamp || data.createdAt is int)) &&
              (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 1000)) &&
              (!('bio' in data) || (data.bio is string && data.bio.size() <= 2000)) &&
@@ -114,6 +116,7 @@ service cloud.firestore {
                       incoming().role == 'buyer';      // Default role
       
       allow update: if isOwner(userId) && 
+                      isValidUserProfileSchema(incoming()) &&
                       (!('email' in incoming()) || incoming().email == existing().email) &&
                       (!('role' in incoming()) || incoming().role == existing().role) &&
                       (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified) &&
@@ -142,14 +145,11 @@ service cloud.firestore {
 
     match /reviews/{reviewId} {
       // Public can read approved reviews for any listing
-      allow read: if isSignedIn() && (
-        existing().status == 'approved' || 
-        isOwner(existing().customerId) || 
-        isOwner(existing().sellerId)
+      allow read, list: if isSignedIn() && (
+        resource.data.status == 'approved' || 
+        resource.data.customerId == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid
       );
-      
-      // Bulk listing of approved reviews (e.g. for a product page)
-      allow list: if isSignedIn() && resource.data.status == 'approved';
 
       allow create: if isSignedIn() && isValidReview(incoming());
       
@@ -164,14 +164,16 @@ service cloud.firestore {
 
     match /chats/{chatId} {
       allow read: if isSignedIn() && request.auth.uid in existing().participants;
-      allow create: if isEmailVerified() && isValidId(chatId) && isValidChat(incoming());
+      allow create: if isEmailVerified() && isValidChat(incoming());
       allow update: if isSignedIn() && request.auth.uid in existing().participants &&
-                      incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageAt']);
+                      incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageAt', 'archivedBy']);
+      allow delete: if isSignedIn() && request.auth.uid in existing().participants;
       
       match /messages/{messageId} {
         allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-        allow create: if isEmailVerified() && isValidId(messageId) && isValidMessage(incoming()) &&
+        allow create: if isEmailVerified() && isValidMessage(incoming()) &&
                       request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow delete: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
       }
     }
   }

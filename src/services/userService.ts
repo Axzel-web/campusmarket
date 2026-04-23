@@ -52,6 +52,8 @@ export const syncUserProfileToSupabase = async (userId: string, data: any) => {
         avatar_url: data.avatarUrl || null,
         course_and_year: data.courseAndYear || null,
         bio: data.bio || null,
+        interests: data.interests || [],
+        onboarded: data.onboarded ?? false,
         updated_at: new Date().toISOString()
       });
     if (error) console.warn("Supabase profile sync error:", error.message);

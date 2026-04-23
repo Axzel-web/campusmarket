@@ -13,6 +13,8 @@ export interface UserProfile {
   avatarUrl?: string;
   role: UserRole;
   isVerified: boolean;
+  onboarded?: boolean;
+  interests?: string[];
   verificationStatus: 'none' | 'pending' | 'approved' | 'rejected';
   createdAt: any; // Timestamp or number
 }
@@ -55,6 +57,7 @@ export interface Chat {
   listingId: string;
   listingTitle: string;
   sellerName?: string;
+  archivedBy?: string[];
 }
 
 export interface Favorite {

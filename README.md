@@ -1,16 +1,23 @@
-# 📌 CampusMarket – Cloud-Based Marketplace System
+# CampusMarket Deployment Guide (Vercel)
 
-## 📖 Description
-CampusMarket is a web-based marketplace platform designed for students to buy, sell, and browse items within the campus community. The system uses a modern cloud-based architecture that separates frontend, authentication, and database services for scalability, maintainability, and performance.
+This project has been adapted for deployment on Vercel. 
 
----
+## Vercel Setup
 
-## ⚙️ System Architecture
+1.  **Framework Preset**: Ensure "Vite" is selected as the Framework Preset in your Vercel project settings.
+2.  **Environment Variables**: Add the following Environment Variables in the Vercel Dashboard:
+    *   `GEMINI_API_KEY`: Your Google AI API key (from Google AI Studio).
+    *   `VITE_APP_URL`: Your Vercel deployment URL (e.g., `https://campusmarket.vercel.app`).
+3.  **Routing**: A `vercel.json` has been added to handle Single Page Application (SPA) routing. This ensures that deep links (like `/market` or `/profile`) work correctly when refreshed.
 
-User
-  ↓
-Vercel (Frontend UI Hosting)
-  ↓
-Firebase (Authentication + Seller Verification)
-  ↓
-Supabase (Database + Storage)
+## Firebase Configuration
+
+1.  **Whitelisting**: Go to the [Firebase Console](https://console.firebase.google.com/), select your project, then navigate to **Authentication > Settings > Authorized Domains**.
+2.  **Add Domain**: Add your Vercel deployment domain (e.g., `campusmarket.vercel.app`) to the list of authorized domains. This is required for Google Sign-In to function.
+
+## Local Development
+
+```bash
+npm install
+npm run dev
+```

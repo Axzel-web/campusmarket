@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, createContext } from 'react';
+import React, { useState, useEffect, useContext, createContext, useRef } from 'react';
 import { 
   BrowserRouter as Router, 
   Routes, 
@@ -65,9 +65,12 @@ import {
   addDoc,
   serverTimestamp,
   getDoc,
+  getDocs,
   deleteDoc,
   getDocFromServer,
-  increment
+  increment,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from './lib/firebase';
@@ -134,8 +137,10 @@ interface AppContextType {
   deleteListing: (listingId: string) => Promise<void>;
   markAsSold: (listingId: string) => Promise<void>;
   toggleFavorite: (listingId: string) => void;
-  createChat: (listing: Listing) => string;
+  createChat: (listing: Listing) => Promise<string>;
   sendMessage: (chatId: string, text: string) => void;
+  deleteMessage: (chatId: string, messageId: string) => Promise<void>;
+  deleteChat: (chatId: string) => Promise<void>;
   replyToReview: (reviewId: string, text: string) => void;
   archiveReview: (reviewId: string) => void;
   reportReview: (reviewId: string, reason: string) => void;
@@ -253,9 +258,12 @@ const Sidebar = () => {
         ))}
       </nav>
 
-      <div className="campus-gradient p-4 rounded-xl text-white mt-auto">
-        <p className="font-bold text-sm mb-1">📍 Campus University</p>
-        <p className="text-[10px] opacity-80 font-medium">Verified Campus Only Environment</p>
+      <div className="uiverse-card p-4 rounded-2xl text-white mt-auto relative group transition-all hover:scale-[1.02]">
+        <div className="uiverse-border rounded-2xl"></div>
+        <div className="relative z-10">
+          <p className="font-black text-xs mb-1 tracking-tight">Campus University</p>
+          <p className="text-[9px] opacity-70 font-bold uppercase tracking-widest leading-none">Verified Campus Only Environment</p>
+        </div>
       </div>
     </aside>
   );
@@ -263,13 +271,16 @@ const Sidebar = () => {
 
 const RecentChatItem = ({ chat, currentUserId }: { chat: Chat, currentUserId: string }) => {
   const [partnerName, setPartnerName] = useState<string>(chat.sellerName || chat.listingTitle);
+  const [partner, setPartner] = useState<any>(null);
 
   useEffect(() => {
     const partnerId = chat.participants.find(p => p !== currentUserId);
     if (partnerId) {
       getDoc(doc(db, 'users', partnerId)).then(snap => {
         if (snap.exists()) {
-          setPartnerName(snap.data().fullName);
+          const data = snap.data();
+          setPartnerName(data.fullName);
+          setPartner(data);
         }
       });
     }
@@ -278,16 +289,20 @@ const RecentChatItem = ({ chat, currentUserId }: { chat: Chat, currentUserId: st
   return (
     <Link 
       to={`/chat/${chat.id}`}
-      className="flex items-center gap-3 group cursor-pointer hover:bg-bg-light p-1 rounded-lg transition-colors"
+      className="flex items-center gap-3 group cursor-pointer hover:bg-bg-light p-1.5 rounded-xl transition-all"
     >
-      <div className="w-8 h-8 rounded-xl bg-accent-subtle flex-shrink-0 flex items-center justify-center text-brand-primary font-bold text-[10px] border border-border-main">
-        {partnerName[0]}
+      <div className="w-9 h-9 rounded-xl bg-accent-subtle flex-shrink-0 flex items-center justify-center text-brand-primary font-black text-xs border border-border-main overflow-hidden shadow-sm">
+        {partner?.avatarUrl ? (
+            <img src={partner.avatarUrl} alt={partnerName} className="w-full h-full object-cover" />
+        ) : (
+            partnerName[0]
+        )}
       </div>
-      <div className="min-w-0">
-        <p className="text-[11px] font-bold text-text-main group-hover:text-brand-primary transition-colors truncate leading-tight">
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-black text-text-main group-hover:text-brand-primary transition-colors truncate leading-none mb-1">
           {partnerName}
         </p>
-        <p className="text-[9px] text-text-muted truncate font-medium">
+        <p className="text-[9px] text-text-muted truncate font-bold uppercase tracking-wider opacity-60">
           {chat.listingTitle}
         </p>
       </div>
@@ -1036,8 +1051,17 @@ const ProfilePage = () => {
                   {user.courseAndYear || 'Student Buyer'}
                 </p>
               </div>
-              <div className="hidden md:block pb-2">
-                 <button className="px-5 py-2.5 bg-bg-light border border-border-main rounded-2xl text-xs font-bold text-text-main hover:bg-white transition-all shadow-sm">
+              <div className="hidden md:flex gap-2 pb-2">
+                 <button 
+                   onClick={() => navigate('/onboarding')}
+                   className="px-5 py-2.5 bg-brand-primary text-white rounded-2xl text-xs font-bold hover:opacity-90 transition-all shadow-sm"
+                 >
+                   Redo Onboarding
+                 </button>
+                 <button 
+                   onClick={() => navigate('/edit-profile')}
+                   className="px-5 py-2.5 bg-bg-light border border-border-main rounded-2xl text-xs font-bold text-text-main hover:bg-white transition-all shadow-sm"
+                 >
                    Edit Profile
                  </button>
               </div>
@@ -1134,6 +1158,8 @@ const ProfilePage = () => {
           <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] pl-4 mb-4">Account Settings</h3>
           <div className="grid grid-cols-1 gap-2">
             {[
+              { icon: User, label: 'Edit Profile Settings', path: '/edit-profile', desc: 'Update your personal info' },
+              { icon: Sparkles, label: 'Redo Onboarding', path: '/onboarding', desc: 'Re-run the welcome induction' },
               { icon: Heart, label: 'Manage Favorites', path: '/favorites', desc: 'Items you have saved' },
               { icon: ShoppingBag, label: 'Transaction History', path: '/purchases', desc: 'Your orders and sales' },
               { icon: ShieldCheck, label: 'Privacy & Security', path: '/settings', desc: 'Account protection' },
@@ -1764,10 +1790,11 @@ const SellPage = () => {
 
   const ListingDetail = () => {
     const { id } = useParams<{ id: string }>();
-    const { listings, user, createChat, deleteListing, markAsSold } = useApp();
+    const { listings, user, favorites, toggleFavorite, createChat, deleteListing, markAsSold } = useApp();
     const navigate = useNavigate();
     const listing = listings.find(l => l.id === id);
     const [activeImageIndex, setActiveImageIndex] = useState(0);
+    const isFavorite = listing ? favorites.includes(listing.id) : false;
   
     useEffect(() => {
       if (id && user && listing && listing.sellerId !== user.id) {
@@ -1781,128 +1808,204 @@ const SellPage = () => {
   
     if (!listing) return null;
 
-  const handleMessage = () => {
-    const chatId = createChat(listing);
-    navigate(`/chat/${chatId}`);
+  const handleMessage = async () => {
+    const chatId = await createChat(listing);
+    if (chatId) {
+      navigate(`/chat/${chatId}`);
+    }
   };
 
   const images = listing.images.length > 0 ? listing.images : [`https://picsum.photos/seed/${listing.id}/800/800`];
 
   return (
-    <div className="flex-1 px-6 py-6 overflow-y-auto no-scrollbar max-w-4xl mx-auto w-full">
-       <button onClick={() => navigate(-1)} className="mb-6 p-2 bg-white rounded-xl border border-border-main shadow-sm flex items-center gap-2 text-sm font-medium hover:bg-bg-light transition-colors">
-        <ArrowLeft size={18} /> Back to Market
-      </button>
-
-      <div className="grid md:grid-cols-2 gap-8">
-        <div className="space-y-4">
-          <div className="aspect-square rounded-3xl overflow-hidden bg-bg-light border border-border-main">
-            <img 
-              src={images[activeImageIndex]} 
-              alt={listing.title}
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover transition-all duration-300"
-            />
-          </div>
-          
-          {images.length > 1 && (
-            <div className="grid grid-cols-4 gap-3">
-              {images.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveImageIndex(idx)}
-                  className={cn(
-                    "aspect-square rounded-xl overflow-hidden border-2 transition-all",
-                    activeImageIndex === idx ? "border-brand-primary ring-2 ring-brand-primary/20 scale-95" : "border-transparent opacity-60 hover:opacity-100"
-                  )}
-                >
-                  <img src={img} alt={`${listing.title} ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="px-4 space-y-6">
-          <div>
-            <span className="px-3 py-1 bg-accent-subtle text-brand-primary rounded-full text-xs font-bold uppercase tracking-wider">
-              {listing.category}
-            </span>
-            <h1 className="text-3xl font-bold text-text-main mt-2">{listing.title}</h1>
-            <p className="text-3xl font-black text-brand-primary mt-2">₱{listing.price.toLocaleString()}</p>
-          </div>
-
-          <div className="p-4 bg-bg-light rounded-2xl flex items-center justify-between border border-border-main">
+    <div className="flex-1 px-4 py-8 md:px-8 overflow-y-auto no-scrollbar bg-white min-h-screen">
+       <div className="max-w-5xl mx-auto space-y-8 pb-20">
+        <header className="flex items-center justify-between">
+            <button onClick={() => navigate(-1)} className="group p-2 flex items-center gap-2 text-sm font-black text-text-muted hover:text-brand-primary transition-colors uppercase tracking-widest">
+                <div className="w-8 h-8 rounded-full bg-bg-light border border-border-main flex items-center justify-center group-hover:bg-accent-subtle group-hover:border-brand-primary transition-all">
+                    <ArrowLeft size={16} />
+                </div>
+                Back to Market
+            </button>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center font-bold text-brand-primary border border-border-main shadow-sm text-xl uppercase overflow-hidden">
-                {listing.sellerAvatar ? (
-                  <img src={listing.sellerAvatar} alt={listing.sellerName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  listing.sellerName[0]
+                <button 
+                    onClick={() => toggleFavorite(listing.id)}
+                    className={cn(
+                        "w-11 h-11 rounded-2xl flex items-center justify-center transition-all border shadow-sm",
+                        isFavorite 
+                            ? "bg-red-50 border-red-100 text-red-500 shadow-red-100" 
+                            : "bg-white border-border-main text-text-muted hover:border-red-200 hover:text-red-400"
+                    )}
+                >
+                    <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />
+                </button>
+                <button className="w-11 h-11 rounded-2xl bg-white border border-border-main flex items-center justify-center text-text-muted hover:text-brand-primary transition-all shadow-sm">
+                    <Archive size={20} />
+                </button>
+            </div>
+        </header>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            {/* Visuals - 7/12 cols */}
+            <div className="lg:col-span-7 space-y-6">
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="aspect-[4/5] md:aspect-square rounded-[40px] overflow-hidden bg-bg-light border border-border-main relative group shadow-2xl shadow-black/5"
+                >
+                    <img 
+                        src={images[activeImageIndex]} 
+                        alt={listing.title}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute top-6 left-6 flex flex-col gap-2">
+                        <span className="px-4 py-1.5 bg-white/90 backdrop-blur-md text-brand-primary rounded-full text-[10px] font-black uppercase tracking-widest border border-white/20 shadow-xl">
+                            {listing.category}
+                        </span>
+                        <span className="px-4 py-1.5 bg-text-main/90 backdrop-blur-md text-white rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 shadow-xl">
+                            {listing.condition}
+                        </span>
+                    </div>
+                </motion.div>
+            
+                {images.length > 1 && (
+                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+                        {images.map((img, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => setActiveImageIndex(idx)}
+                                className={cn(
+                                    "w-20 h-20 rounded-2xl flex-shrink-0 overflow-hidden border-2 transition-all relative",
+                                    activeImageIndex === idx 
+                                        ? "border-brand-primary ring-4 ring-brand-primary/10" 
+                                        : "border-transparent opacity-50 hover:opacity-100"
+                                )}
+                            >
+                                <img src={img} alt={`${listing.title} ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                {activeImageIndex === idx && (
+                                    <div className="absolute inset-0 bg-brand-primary/10"></div>
+                                )}
+                            </button>
+                        ))}
+                    </div>
                 )}
-              </div>
-              <div>
-                <p className="font-bold text-text-main">{listing.sellerName}</p>
-                <p className="text-xs text-text-muted">Student Seller</p>
-              </div>
             </div>
-            <Link to={`/profile/${listing.sellerId}`} className="text-brand-primary font-bold text-xs hover:underline">
-              View Profile
-            </Link>
-          </div>
 
-          <div className="space-y-2">
-            <h3 className="font-bold text-text-main">Description</h3>
-            <p className="text-text-muted leading-relaxed whitespace-pre-wrap">{listing.description}</p>
-          </div>
+            {/* Info - 5/12 cols */}
+            <div className="lg:col-span-5 flex flex-col pt-2">
+                <div className="mb-8">
+                    <h1 className="text-4xl font-black text-text-main tracking-tight leading-tight mb-4">{listing.title}</h1>
+                    <div className="flex items-end gap-3">
+                        <span className="text-4xl font-black text-brand-primary">₱{listing.price.toLocaleString()}</span>
+                        <span className="text-text-muted text-sm font-bold mb-1.5 uppercase tracking-wider">Fixed Price</span>
+                    </div>
+                </div>
 
-          <div className="flex flex-wrap gap-2">
-            {listing.tags.map(tag => (
-              <span key={tag} className="px-3 py-1 bg-white border border-border-main text-text-muted rounded-full text-[10px] font-medium">#{tag}</span>
-            ))}
-          </div>
+                <Link to={`/profile/${listing.sellerId}`} className="group p-5 bg-bg-light rounded-[32px] flex items-center justify-between border border-border-main transition-all hover:bg-white hover:border-brand-primary/30 mb-8 relative">
+                    <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center font-black text-brand-primary border border-border-main shadow-sm text-2xl uppercase overflow-hidden">
+                            {listing.sellerAvatar ? (
+                                <img src={listing.sellerAvatar} alt={listing.sellerName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                                listing.sellerName[0]
+                            )}
+                        </div>
+                        <div>
+                            <p className="font-extrabold text-text-main text-base group-hover:text-brand-primary transition-colors">{listing.sellerName}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                                <ShieldCheck size={14} className="text-brand-primary" />
+                                <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Verified Seller</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="w-10 h-10 rounded-full border border-border-main flex items-center justify-center text-text-muted group-hover:bg-brand-primary group-hover:text-white group-hover:border-brand-primary transition-all">
+                        <ChevronRight size={20} />
+                    </div>
+                </Link>
 
-          {user?.id !== listing.sellerId ? (
-            <div className="flex gap-3">
-              <button 
-                onClick={handleMessage}
-                className="flex-1 py-4 bg-brand-primary text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-brand-primary/10 hover:bg-brand-primary-hover transition-colors"
-              >
-                <MessageSquare size={20} /> Chat Seller
-              </button>
+                {/* Stats Bento */}
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                    <div className="p-4 bg-accent-subtle/50 rounded-2xl border border-brand-primary/10">
+                        <p className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1 opacity-60">Visual Interest</p>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl font-black text-text-main">{listing.views}</span>
+                            <span className="text-xs font-bold text-text-muted uppercase">Views</span>
+                        </div>
+                    </div>
+                    <div className="p-4 bg-accent-subtle/50 rounded-2xl border border-brand-primary/10">
+                        <p className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1 opacity-60">Availability</p>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl font-black text-text-main">{listing.quantity}</span>
+                            <span className="text-xs font-bold text-text-muted uppercase">Units</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    <div className="space-y-3">
+                        <h3 className="text-xs font-black text-text-muted uppercase tracking-[0.2em]">Listing Details</h3>
+                        <p className="text-text-main text-sm font-medium leading-relaxed whitespace-pre-wrap bg-white p-6 rounded-3xl border border-border-main shadow-sm">
+                            {listing.description}
+                        </p>
+                    </div>
+
+                    {listing.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                            {listing.tags.map(tag => (
+                                <span key={tag} className="px-4 py-2 bg-bg-light border border-border-main text-text-muted rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-white hover:text-brand-primary transition-colors cursor-pointer">
+                                    #{tag}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="mt-auto pt-10">
+                    {user?.id !== listing.sellerId ? (
+                        <button 
+                            onClick={handleMessage}
+                            className="w-full py-5 bg-brand-primary text-white rounded-[24px] font-black text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl shadow-brand-primary/25 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        >
+                            <MessageSquare size={20} /> Chat & Inquire
+                        </button>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-3xl flex items-start gap-4">
+                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-amber-500 shadow-sm flex-shrink-0">
+                                    <AlertCircle size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-[11px] text-amber-800 font-extrabold uppercase tracking-widest mb-0.5">Seller Dashboard</p>
+                                    <p className="text-xs text-amber-700 font-medium opacity-80 leading-snug">This is your listing. Keep track of views and status here.</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button 
+                                    onClick={() => {
+                                        if (window.confirm('Are you sure you want to delete this listing?')) {
+                                            deleteListing(listing.id);
+                                            navigate('/market');
+                                        }
+                                    }}
+                                    className="py-4 border border-red-200 text-red-500 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-50 transition-all shadow-sm"
+                                >
+                                    <Trash2 size={16} /> Delete
+                                </button>
+                                <button 
+                                    onClick={() => markAsSold(listing.id)}
+                                    disabled={listing.status === 'sold'}
+                                    className="py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                                >
+                                    <CheckCircle size={16} /> {listing.status === 'sold' ? 'Sold Out' : 'Mark Sold'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
-                <p className="text-xs text-amber-800 font-bold flex items-center gap-2">
-                  <AlertCircle size={14} /> Seller Controls
-                </p>
-                <p className="text-[10px] text-amber-700 mt-1">You are the owner of this listing. You can manage it from here.</p>
-              </div>
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => {
-                    if (window.confirm('Are you sure you want to delete this listing?')) {
-                      deleteListing(listing.id);
-                      navigate('/market');
-                    }
-                  }}
-                  className="flex-1 py-4 border-2 border-red-500 text-red-500 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-50"
-                >
-                  <Trash2 size={20} /> Delete Product
-                </button>
-                <button 
-                  onClick={() => markAsSold(listing.id)}
-                  disabled={listing.status === 'sold'}
-                  className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <CheckCircle size={20} /> {listing.status === 'sold' ? 'Sold Out' : 'Mark as Sold'}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
-      </div>
+       </div>
     </div>
   );
 };
@@ -1995,6 +2098,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
           courseAndYear: '',
           role: 'buyer',
           isVerified: false,
+          onboarded: false,
           verificationStatus: 'none',
           createdAt: serverTimestamp()
         };
@@ -2136,11 +2240,13 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
       orderBy('lastMessageAt', 'desc')
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ 
-        ...d.data(), 
-        id: d.id, 
-        lastMessageAt: toMillis(d.data().lastMessageAt) 
-      } as Chat));
+      const data = snapshot.docs
+        .map(d => ({ 
+          ...d.data(), 
+          id: d.id, 
+          lastMessageAt: toMillis(d.data().lastMessageAt) 
+        } as Chat))
+        .filter(c => !c.archivedBy?.includes(user.id));
       setChats(data);
     }, (error) => {
       console.error("Chats sync error:", error);
@@ -2360,16 +2466,43 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const createChat = async (listing: Listing) => {
     if (!user) return '';
     try {
-      const existing = chats.find(c => c.listingId === listing.id && c.participants.includes(user.id));
+      // 1. Check in active chats (not archived)
+      const existing = chats.find(c => 
+        c.participants.length === 2 && 
+        c.participants.includes(user.id) && 
+        c.participants.includes(listing.sellerId)
+      );
+      
       if (existing) return existing.id;
 
+      // 2. Check all chats in database (might be archived)
+      const q = query(
+        collection(db, 'chats'),
+        where('participants', 'array-contains', user.id)
+      );
+      const snap = await getDocs(q);
+      const dbChat = snap.docs.find(d => {
+        const p = d.data().participants || [];
+        return p.length === 2 && p.includes(listing.sellerId);
+      });
+
+      if (dbChat) {
+        // Un-archive if it was archived
+        await updateDoc(doc(db, 'chats', dbChat.id), {
+          archivedBy: arrayRemove(user.id)
+        });
+        return dbChat.id;
+      }
+
+      // 3. Create new if truly doesn't exist
       const chatRef = await addDoc(collection(db, 'chats'), {
         participants: [user.id, listing.sellerId],
         listingId: listing.id,
         listingTitle: listing.title,
         sellerName: listing.sellerName,
         lastMessage: 'Started a chat',
-        lastMessageAt: serverTimestamp()
+        lastMessageAt: serverTimestamp(),
+        archivedBy: []
       });
       return chatRef.id;
     } catch (error) {
@@ -2388,10 +2521,33 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
       });
       await updateDoc(doc(db, 'chats', chatId), {
         lastMessage: text,
-        lastMessageAt: serverTimestamp()
+        lastMessageAt: serverTimestamp(),
+        archivedBy: [] // Un-archive for everyone on new activity
       });
     } catch (error) {
       handleFirestoreError(error, 'create', `chats/${chatId}/messages`);
+    }
+  };
+
+  const deleteMessage = async (chatId: string, messageId: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'chats', chatId, 'messages', messageId));
+      addNotification('Message deleted', 'info');
+    } catch (error) {
+      handleFirestoreError(error, 'delete', `chats/${chatId}/messages/${messageId}`);
+    }
+  };
+
+  const deleteChat = async (chatId: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'chats', chatId), {
+        archivedBy: arrayUnion(user.id)
+      });
+      addNotification('Conversation archived', 'info');
+    } catch (error) {
+      handleFirestoreError(error, 'update', `chats/${chatId}`);
     }
   };
 
@@ -2467,7 +2623,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
   return (
     <AppContext.Provider value={{ 
       user, loading, listings, myListings, favorites, reviews, chats, messages, search, setSearch, listingsLoading,
-      login, logout, updateProfile, addListing, updateListing, deleteListing, markAsSold, toggleFavorite, createChat, sendMessage,
+      login, logout, updateProfile, addListing, updateListing, deleteListing, markAsSold, toggleFavorite, createChat, sendMessage, deleteMessage, deleteChat,
       replyToReview, archiveReview, reportReview,
       sellerApplication, submitSellerApplication,
       notifications, addNotification, removeNotification,
@@ -2486,12 +2642,21 @@ import { useParams } from 'react-router-dom';
 
 const ChatPage = () => {
     const { id } = useParams<{ id: string }>();
-    const { chats, sendMessage, user } = useApp();
+    const { chats, sendMessage, deleteMessage, deleteChat, user } = useApp();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [text, setText] = useState('');
     const chat = chats.find(c => c.id === id);
     const navigate = useNavigate();
     const [partner, setPartner] = useState<UserProfile | null>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
 
     useEffect(() => {
         if (!id || !chat || !user) return;
@@ -2519,37 +2684,89 @@ const ChatPage = () => {
 
     if (!chat || !user) return null;
 
+    const handleArchiveMessage = async (msgId: string) => {
+        if (window.confirm("Delete this message?")) {
+            await deleteMessage(chat.id, msgId);
+        }
+    };
+
+    const handleArchiveChat = async () => {
+        if (window.confirm("Archive this conversation? It will be hidden until a new message arrives.")) {
+            await deleteChat(chat.id);
+            navigate('/messages');
+        }
+    };
+
     return (
-        <div className="h-screen flex flex-col bg-white">
-            <div className="p-4 border-b flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-400 hover:text-slate-600">
+        <div className="h-full flex flex-col bg-white overflow-hidden relative border-x border-border-main">
+            <div className="p-4 border-b flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-10">
+                <div className="flex items-center gap-3">
+                    <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-400 hover:text-brand-primary transition-colors">
                         <ArrowLeft size={24} />
                     </button>
-                    <div>
-                    <h2 className="font-bold text-slate-800">{partner?.fullName || chat.sellerName || 'Chat'}</h2>
-                    <p className="text-xs text-slate-500">{chat.listingTitle}</p>
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-accent-subtle border border-border-main flex items-center justify-center text-brand-primary font-bold overflow-hidden">
+                            {partner?.avatarUrl ? (
+                                <img src={partner.avatarUrl} alt={partner.fullName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                                (partner?.fullName?.[0] || chat.sellerName?.[0] || '?')
+                            )}
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-slate-800 leading-tight">{partner?.fullName || chat.sellerName || 'Chat'}</h2>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{chat.listingTitle}</p>
+                        </div>
                     </div>
                 </div>
-                {partner && (
-                    <Link to={`/profile/${partner.id}`} className="text-brand-primary font-bold text-xs hover:underline bg-accent-subtle px-3 py-1.5 rounded-lg transition-colors">
-                        View Profile
-                    </Link>
-                )}
+                <div className="flex items-center gap-2">
+                    {partner && (
+                        <Link to={`/profile/${partner.id}`} className="text-brand-primary font-bold text-xs hover:bg-brand-primary group transition-all bg-accent-subtle px-3 py-2 rounded-xl flex items-center gap-1.5 md:px-4">
+                            <User size={14} className="group-hover:text-white" />
+                            <span className="group-hover:text-white hidden md:inline">Profile</span>
+                        </Link>
+                    )}
+                    <button 
+                        onClick={handleArchiveChat}
+                        className="p-2 text-text-muted hover:text-brand-primary hover:bg-bg-light rounded-xl transition-all"
+                        title="Archive Conversation"
+                    >
+                        <Archive size={20} />
+                    </button>
+                </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
                 {messages.map(m => (
                     <div key={m.id} className={cn(
-                        "max-w-[80%] p-3 rounded-2xl text-sm font-medium",
-                        m.senderId === user.id ? "ml-auto bg-brand-primary text-white rounded-tr-none shadow-sm" : "bg-bg-light text-text-main border border-border-main rounded-tl-none"
+                        "flex flex-col group",
+                        m.senderId === user.id ? "items-end" : "items-start"
                     )}>
-                        {m.text}
+                        <div className={cn(
+                            "max-w-[85%] p-3 px-4 rounded-[20px] text-sm font-medium relative group",
+                            m.senderId === user.id 
+                                ? "bg-brand-primary text-white rounded-tr-none shadow-sm" 
+                                : "bg-bg-light text-text-main border border-border-main rounded-tl-none"
+                        )}>
+                            {m.text}
+                            
+                            {m.senderId === user.id && (
+                                <button 
+                                    onClick={() => handleArchiveMessage(m.id)}
+                                    className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 text-text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            )}
+                        </div>
+                        <span className="text-[9px] text-text-muted font-bold mt-1 px-1">
+                            {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                     </div>
                 ))}
+                <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-4 border-t border-border-main pb-safe">
+            <div className="p-4 border-t border-border-main pb-safe bg-white">
                 <form className="flex gap-2" onSubmit={(e) => {
                     e.preventDefault();
                     if (text.trim()) {
@@ -2591,37 +2808,378 @@ const SellerDashboardPage = () => {
 };
 
 const ChatItem = ({ chat, currentUserId }: { chat: Chat, currentUserId: string }) => {
+    const { deleteChat } = useApp();
     const [partnerName, setPartnerName] = useState<string>(chat.sellerName || chat.listingTitle);
+    const [partnerAvatar, setPartnerAvatar] = useState<string | null>(null);
 
     useEffect(() => {
-        // If we don't have a specific sellerName or if we want to ensure we show the partner's name
-        // (whether they are the buyer or seller), we fetch it based on the participant list.
         const partnerId = chat.participants.find(p => p !== currentUserId);
         if (partnerId) {
             getDoc(doc(db, 'users', partnerId)).then(snap => {
                 if (snap.exists()) {
-                    setPartnerName(snap.data().fullName);
+                    const data = snap.data();
+                    setPartnerName(data.fullName);
+                    setPartnerAvatar(data.avatarUrl || null);
                 }
             });
         }
     }, [chat, currentUserId]);
 
+    const handleArchive = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.confirm("Archive this conversation?")) {
+            await deleteChat(chat.id);
+        }
+    };
+
     return (
-        <Link 
-            to={`/chat/${chat.id}`}
-            className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-border-main shadow-sm hover:border-brand-primary active:scale-[0.98] transition-all"
-        >
-            <div className="w-12 h-12 rounded-xl bg-accent-subtle flex items-center justify-center text-brand-primary font-bold border border-border-main">
-                {partnerName[0]}
+        <div className="group relative">
+            <Link 
+                to={`/chat/${chat.id}`}
+                className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-border-main shadow-sm hover:border-brand-primary active:scale-[0.98] transition-all"
+            >
+                <div className="w-12 h-12 rounded-xl bg-accent-subtle flex items-center justify-center text-brand-primary font-bold border border-border-main overflow-hidden">
+                    {partnerAvatar ? (
+                        <img src={partnerAvatar} alt={partnerName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                        partnerName[0]
+                    )}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-text-main truncate">{partnerName}</h3>
+                    <p className="text-[13px] text-text-muted truncate font-medium">{chat.lastMessage}</p>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                    <span className="text-[10px] text-text-muted font-bold whitespace-nowrap">
+                        {new Date(chat.lastMessageAt || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <button 
+                        onClick={handleArchive}
+                        className="p-1.5 text-text-muted hover:text-brand-primary hover:bg-bg-light rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                        title="Archive Conversation"
+                    >
+                        <Archive size={14} />
+                    </button>
+                </div>
+            </Link>
+        </div>
+    );
+};
+
+import { SpiderCursor } from "@/components/ui/spider-cursor";
+const OnboardingPage = () => {
+    const { user, updateProfile, addNotification } = useApp();
+    const [step, setStep] = useState(1);
+    const [formData, setFormData] = useState({
+        fullName: user?.fullName || '',
+        courseAndYear: user?.courseAndYear || '',
+        bio: user?.bio || '',
+        interests: [] as string[]
+    });
+    const navigate = useNavigate();
+
+    const interests = ['Gadgets', 'Books', 'Uniforms', 'Notes', 'Events', 'Food'];
+
+    const toggleInterest = (interest: string) => {
+        setFormData(prev => ({
+            ...prev,
+            interests: prev.interests.includes(interest)
+                ? prev.interests.filter(i => i !== interest)
+                : [...prev.interests, interest]
+        }));
+    };
+
+    const handleNext = () => setStep(prev => Math.min(prev + 1, 3));
+    const handleBack = () => setStep(prev => Math.max(prev - 1, 1));
+
+    const handleComplete = async () => {
+        if (!formData.fullName || !formData.courseAndYear) {
+            addNotification("Please fill in the required fields.", "error");
+            setStep(1); 
+            return;
+        }
+
+        await updateProfile({
+            ...formData,
+            onboarded: true
+        });
+
+        addNotification("Welcome to CampusMarket! Your profile is ready.", "success");
+        navigate('/market');
+    };
+
+    const handleSkip = () => {
+        if (step === 2) {
+            handleNext();
+        } else if (step === 3) {
+            handleComplete();
+        }
+    };
+
+    const slideStyles = {
+        '--color-orange': '#EF895F',
+        '--color-dark': '#221F1E',
+        '--color-bg': '#E8F6EF',
+    } as React.CSSProperties;
+
+    return (
+        <div className="min-h-screen flex items-center justify-center p-4 md:p-6 font-hind relative overflow-hidden" style={slideStyles}>
+            <div className="fixed inset-0 -z-10 bg-black overflow-hidden pointer-events-none">
+                <SpiderCursor />
             </div>
-            <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-text-main truncate">{partnerName}</h3>
-                <p className="text-[13px] text-text-muted truncate font-medium">{chat.lastMessage}</p>
+            
+            <motion.main 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="relative w-full max-w-[356px] bg-[#221F1E] rounded-[1.25rem] py-12 px-0 text-center overflow-hidden shadow-2xl"
+            >
+                {step > 1 && (
+                    <button 
+                        onClick={handleSkip}
+                        className="absolute top-6 right-6 text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#EF895F] transition-colors z-20"
+                    >
+                        Skip
+                    </button>
+                )}
+
+                <div 
+                    className="flex transition-all duration-500 ease-in-out"
+                    style={{ 
+                        width: '300%', 
+                        marginLeft: `-${(step - 1) * 100}%` 
+                    }}
+                >
+                    <article className="w-full px-8 flex flex-col items-center">
+                        <img src="https://c.top4top.io/p_2020eq9aa1.png" alt="illustration" className="w-[90%] mb-4" />
+                        <div className="space-y-4">
+                            <h2 className="text-[1.75rem] font-semibold text-white leading-tight">The Essentials.</h2>
+                            <p className="text-sm text-white/60 font-light px-2 leading-relaxed">Every profile is verified to keep our community safe.</p>
+                            
+                            <div className="space-y-3 pt-2 w-full text-left">
+                                <input 
+                                    type="text" 
+                                    value={formData.fullName}
+                                    onChange={e => setFormData({ ...formData, fullName: e.target.value })}
+                                    className="w-full h-11 px-4 rounded-xl bg-white/10 border border-white/10 focus:border-[#EF895F] focus:ring-1 focus:ring-[#EF895F] outline-none transition-all text-white text-sm"
+                                    placeholder="Full Name"
+                                />
+                                <input 
+                                    type="text" 
+                                    value={formData.courseAndYear}
+                                    onChange={e => setFormData({ ...formData, courseAndYear: e.target.value })}
+                                    className="w-full h-11 px-4 rounded-xl bg-white/10 border border-white/10 focus:border-[#EF895F] focus:ring-1 focus:ring-[#EF895F] outline-none transition-all text-white text-sm"
+                                    placeholder="Course & Year"
+                                />
+                            </div>
+                        </div>
+                    </article>
+
+                    <article className="w-full px-8 flex flex-col items-center">
+                        <img src="https://e.top4top.io/p_2020mx8xt3.png" alt="illustration" className="w-[90%] mb-4" />
+                        <div className="space-y-4 w-full">
+                            <h2 className="text-[1.75rem] font-semibold text-white leading-tight">Your Story.</h2>
+                            <p className="text-sm text-white/60 font-light px-2 leading-relaxed">A great bio increases trust during meetups.</p>
+                            <textarea 
+                                value={formData.bio}
+                                onChange={e => setFormData({ ...formData, bio: e.target.value })}
+                                className="w-full h-32 p-4 rounded-xl bg-white/10 border border-white/10 focus:border-[#EF895F] focus:ring-1 focus:ring-[#EF895F] outline-none transition-all text-white text-sm resize-none"
+                                placeholder="Tell us about yourself..."
+                            />
+                        </div>
+                    </article>
+
+                    <article className="w-full px-8 flex flex-col items-center">
+                        <img src="https://d.top4top.io/p_20200jsuo2.png" alt="illustration" className="w-[90%] mb-4" />
+                        <div className="space-y-4 w-full">
+                            <h2 className="text-[1.75rem] font-semibold text-white leading-tight">Taste.</h2>
+                            <p className="text-sm text-white/60 font-light px-2 leading-relaxed">What are you looking for today?</p>
+                            
+                            <div className="grid grid-cols-2 gap-2 w-full pt-2">
+                                {interests.map(interest => (
+                                    <button
+                                        key={interest}
+                                        onClick={() => toggleInterest(interest)}
+                                        className={cn(
+                                            "h-10 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-all",
+                                            formData.interests.includes(interest)
+                                                ? "bg-[#EF895F] text-white border-[#EF895F]"
+                                                : "bg-white/5 text-white/60 border-white/10 hover:border-white/30"
+                                        )}
+                                    >
+                                        {interest}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <div className="px-8 mt-6">
+                    <button 
+                        onClick={step === 3 ? handleComplete : handleNext}
+                        disabled={step === 1 && (!formData.fullName || !formData.courseAndYear)}
+                        className={cn(
+                            "w-full h-12 bg-[#EF895F] text-white rounded-xl font-medium tracking-widest text-lg transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none shadow-sm",
+                            step === 3 && "shadow-[0_4px_20px_rgba(239,137,95,0.4)]"
+                        )}
+                    >
+                        {step === 3 ? 'Get Started' : 'Next'}
+                    </button>
+
+                    <div className="flex justify-center gap-1.5 mt-6">
+                        {[1, 2, 3].map(i => (
+                            <div 
+                                key={i}
+                                className={cn(
+                                    "h-1.5 rounded-full transition-all duration-500",
+                                    step === i ? "w-6 bg-white" : "w-2 bg-white/20"
+                                )}
+                            />
+                        ))}
+                    </div>
+
+                    {step > 1 && (
+                        <button 
+                            onClick={handleBack}
+                            className="mt-6 text-[10px] text-white/40 uppercase tracking-widest font-bold hover:text-white transition-colors"
+                        >
+                            Go Back
+                        </button>
+                    )}
+                </div>
+            </motion.main>
+        </div>
+    );
+};
+
+const EditProfilePage = () => {
+    const { user, updateProfile, addNotification } = useApp();
+    const navigate = useNavigate();
+    const [formData, setFormData] = useState({
+        fullName: user?.fullName || '',
+        courseAndYear: user?.courseAndYear || '',
+        bio: user?.bio || '',
+        interests: user?.interests || [] as string[]
+    });
+    const [saving, setSaving] = useState(false);
+
+    const interests = ['Gadgets', 'Books', 'Uniforms', 'Notes', 'Events', 'Food'];
+
+    const toggleInterest = (interest: string) => {
+        setFormData(prev => ({
+            ...prev,
+            interests: prev.interests.includes(interest)
+                ? prev.interests.filter(i => i !== interest)
+                : [...prev.interests, interest]
+        }));
+    };
+
+    const handleSave = async () => {
+        if (!formData.fullName || !formData.courseAndYear) {
+            addNotification("Full name and Course/Year are required.", "error");
+            return;
+        }
+        setSaving(true);
+        try {
+            await updateProfile(formData);
+            addNotification("Profile updated successfully!", "success");
+            navigate('/profile');
+        } catch (err) {
+            addNotification("Failed to update profile.", "error");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (!user) return null;
+
+    return (
+        <div className="flex-1 px-6 py-10 overflow-y-auto no-scrollbar bg-white min-h-screen">
+            <div className="max-w-2xl mx-auto space-y-8">
+                <div className="flex items-center gap-4">
+                    <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-text-muted hover:text-brand-primary transition-colors">
+                        <ArrowLeft size={24} />
+                    </button>
+                    <div>
+                        <h1 className="text-2xl font-black text-text-main">Edit Profile</h1>
+                        <p className="text-text-muted text-sm font-medium">Update your campus presence</p>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    {/* Basic Info */}
+                    <div className="p-6 bg-bg-light rounded-[32px] border border-border-main space-y-4">
+                        <h3 className="text-xs font-black text-text-muted uppercase tracking-widest px-1">Basic Information</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-text-muted uppercase tracking-wider px-1">Full Name</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full h-12 px-4 rounded-2xl bg-white border border-border-main focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/5 transition-all outline-none font-medium text-sm"
+                                    value={formData.fullName}
+                                    onChange={e => setFormData({ ...formData, fullName: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-text-muted uppercase tracking-wider px-1">Course & Year</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full h-12 px-4 rounded-2xl bg-white border border-border-main focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/5 transition-all outline-none font-medium text-sm"
+                                    value={formData.courseAndYear}
+                                    onChange={e => setFormData({ ...formData, courseAndYear: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bio */}
+                    <div className="p-6 bg-bg-light rounded-[32px] border border-border-main space-y-4">
+                        <h3 className="text-xs font-black text-text-muted uppercase tracking-widest px-1">About You</h3>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-text-muted uppercase tracking-wider px-1">Bio</label>
+                            <textarea 
+                                className="w-full h-32 p-4 rounded-2xl bg-white border border-border-main focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/5 transition-all outline-none font-medium text-sm resize-none"
+                                placeholder="Tell other students about yourself..."
+                                value={formData.bio}
+                                onChange={e => setFormData({ ...formData, bio: e.target.value })}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Interests */}
+                    <div className="p-6 bg-bg-light rounded-[32px] border border-border-main space-y-4">
+                        <h3 className="text-xs font-black text-text-muted uppercase tracking-widest px-1">Interests</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            {interests.map(interest => (
+                                <button
+                                    key={interest}
+                                    onClick={() => toggleInterest(interest)}
+                                    className={cn(
+                                        "h-11 rounded-xl text-[10px] uppercase tracking-widest font-black border transition-all",
+                                        formData.interests.includes(interest)
+                                            ? "bg-brand-primary text-white border-brand-primary shadow-lg shadow-brand-primary/20"
+                                            : "bg-white text-text-muted border-border-main hover:border-brand-primary/30"
+                                    )}
+                                >
+                                    {interest}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="pt-4">
+                        <button 
+                            disabled={saving}
+                            onClick={handleSave}
+                            className="w-full h-14 bg-brand-primary text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-brand-primary/20 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
+                        >
+                            {saving ? 'Updating Profile...' : 'Save Changes'}
+                        </button>
+                    </div>
+                </div>
             </div>
-            <span className="text-[10px] text-text-muted font-bold whitespace-nowrap">
-                {new Date(chat.lastMessageAt || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-        </Link>
+        </div>
     );
 };
 
@@ -2693,7 +3251,7 @@ const NotificationOverlay = () => {
 };
 
 const AppContent = () => {
-  const { loading } = useApp();
+  const { loading, user } = useApp();
 
   return (
     <AnimatePresence mode="wait">
@@ -2720,13 +3278,16 @@ const AppContent = () => {
               <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/onboarding" element={
+                  user ? <OnboardingPage /> : <Navigate to="/login" replace />
+                } />
                 <Route path="/*" element={
                   <ProtectedRoute>
                     <div className="min-h-screen bg-bg-light font-sans pt-16">
                       <Navbar />
-                      <div className="flex max-w-[1280px] mx-auto min-h-[calc(100vh-64px)]">
+                      <div className="flex max-w-[1280px] mx-auto h-[calc(100vh-64px)] overflow-hidden">
                         <Sidebar />
-                        <main className="flex-1 flex flex-col pb-20 md:pb-0 overflow-y-auto">
+                        <main className="flex-1 flex flex-col pb-20 md:pb-0 overflow-hidden relative">
                           <Routes>
                             <Route path="/" element={<Navigate to="/market" replace />} />
                             <Route path="/market" element={<HomePage />} />
@@ -2739,6 +3300,7 @@ const AppContent = () => {
                             <Route path="/listing/:id" element={<ListingDetail />} />
                             <Route path="/chat/:id" element={<ChatPage />} />
                             <Route path="/messages" element={<MessagesListPage />} />
+                            <Route path="/edit-profile" element={<EditProfilePage />} />
                             <Route path="/dashboard" element={<SellerDashboardPage />} />
                           </Routes>
                         </main>
@@ -2767,7 +3329,15 @@ export default function App() {
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useApp();
+  const location = useLocation();
+
   if (loading) return <LoadingAnimation />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
+  
+  // If user is authenticated but not onboarded, they must go to onboarding
+  if (user && !user.onboarded && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />;
+  }
+
   return <>{children}</>;
 };
