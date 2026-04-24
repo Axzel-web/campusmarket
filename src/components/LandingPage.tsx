@@ -902,7 +902,7 @@ export const LandingPage: React.FC = () => {
 
         .features-grid {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(2, 1fr);
           gap: 2rem;
           margin-top: 4rem;
         }
@@ -1132,48 +1132,32 @@ export const LandingPage: React.FC = () => {
 
       {/* ABOUT SECTION */}
       <section id="about" className="main-section bg-[#c5c0bc]">
-         <div className="about-grid">
+         <div className="max-w-4xl mx-auto">
             <motion.div
-               initial={{ opacity: 0, scale: 0.95 }}
-               whileInView={{ opacity: 1, scale: 1 }}
+               initial={{ opacity: 0, y: 30 }}
+               whileInView={{ opacity: 1, y: 0 }}
                viewport={{ once: true }}
-               transition={{ duration: 1 }}
+               transition={{ duration: 0.8 }}
             >
-               <img 
-                  src="https://picsum.photos/seed/campusLife/800/1000" 
-                  alt="Students on campus" 
-                  className="pill-image"
-                  referrerPolicy="no-referrer"
-               />
-            </motion.div>
-            
-            <div>
-               <motion.div
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.8 }}
-               >
-                  <span className="section-tag">The Story</span>
-                  <h2 className="text-5xl font-bold tracking-tight">Built by students,<br/>for the community.</h2>
+               <span className="section-tag">The Story</span>
+               <h2 className="text-5xl font-bold tracking-tight">Built by students,<br/>for the community.</h2>
+               
+               <div className="mt-8 space-y-6">
+                  <p className="text-lg leading-relaxed">CampusMarket was founded with a singular purpose: to eliminate the friction in university second-hand commerce. We saw students struggling with shipping fees and shady meetups, so we built something better.</p>
+                  <p className="text-lg leading-relaxed">By restricting access to verified university emails, we ensure every person you meet is a peer. It's a high-trust, low-impact way to keep gear in use and money in student pockets.</p>
                   
-                  <div className="mt-8 space-y-6">
-                     <p className="text-lg leading-relaxed">CampusMarket was founded with a singular purpose: to eliminate the friction in university second-hand commerce. We saw students struggling with shipping fees and shady meetups, so we built something better.</p>
-                     <p className="text-lg leading-relaxed">By restricting access to verified university emails, we ensure every person you meet is a peer. It's a high-trust, low-impact way to keep gear in use and money in student pockets.</p>
-                     
-                     <div className="pt-6 grid grid-cols-2 gap-8">
-                        <div>
-                           <h4 className="font-black text-3xl">12k+</h4>
-                           <p className="text-sm uppercase tracking-widest opacity-50 font-sans">Active Users</p>
-                        </div>
-                        <div>
-                           <h4 className="font-black text-3xl">45k</h4>
-                           <p className="text-sm uppercase tracking-widest opacity-50 font-sans">Items Traded</p>
-                        </div>
+                  <div className="pt-6 grid grid-cols-2 gap-8">
+                     <div>
+                        <h4 className="font-black text-3xl">12k+</h4>
+                        <p className="text-sm uppercase tracking-widest opacity-50 font-sans">Active Users</p>
+                     </div>
+                     <div>
+                        <h4 className="font-black text-3xl">45k</h4>
+                        <p className="text-sm uppercase tracking-widest opacity-50 font-sans">Items Traded</p>
                      </div>
                   </div>
-               </motion.div>
-            </div>
+               </div>
+            </motion.div>
          </div>
       </section>
 
@@ -1187,17 +1171,10 @@ export const LandingPage: React.FC = () => {
          <div className="features-grid">
             {[
                {
-                  img: "https://picsum.photos/seed/ai-listing/800/500",
-                  title: "AI Listing Craft",
-                  desc: "Our intelligent system generates descriptive listings from just a few fragments. No more writer's block when selling your old textbooks."
-               },
-               {
-                  img: "https://picsum.photos/seed/campus-trust/800/500",
                   title: "Secure Peer ID",
                   desc: "Every account is tied to a verified university email. Our multi-step verification process ensures the person you're meeting is exactly who they say they are."
                },
                {
-                  img: "https://picsum.photos/seed/green-trade/800/500",
                   title: "Zero Packaging",
                   desc: "Since all trades happen on campus, there's no need for boxes, plastic wrap, or carbon-heavy shipping. It's the greenest way to shop."
                }
@@ -1214,7 +1191,6 @@ export const LandingPage: React.FC = () => {
                      ease: [0.16, 1, 0.3, 1]
                   }}
                >
-                  <img src={feature.img} alt={feature.title} referrerPolicy="no-referrer" />
                   <h4>{feature.title}</h4>
                   <p>{feature.desc}</p>
                </motion.div>
