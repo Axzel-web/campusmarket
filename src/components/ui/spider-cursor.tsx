@@ -20,6 +20,7 @@ export function SpiderCursor() {
           y: rnd(window.innerHeight),
           len: 0,
           r: 0,
+          t: 0,
         }
       })
 

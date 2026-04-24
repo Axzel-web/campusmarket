@@ -33,6 +33,7 @@ import {
   Trash2,
   CheckCircle
 } from 'lucide-react';
+import { SpiderCursor } from "./components/ui/spider-cursor";
 import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication } from './types';
 import { cn, compressImage } from './lib/utils';
 import { generateListingDetails } from './services/geminiService';
@@ -1009,7 +1010,7 @@ const ProfilePage = () => {
 
         {/* Profile Card Magic */}
         <div className="bg-white rounded-[32px] overflow-hidden border border-border-main shadow-sm relative">
-          <div className="h-24 bg-gradient-to-r from-brand-primary to-emerald-400 opacity-90"></div>
+          <div className="h-24 bg-gradient-to-r from-brand-primary to-[#f4a27e] opacity-90"></div>
           <div className="px-8 pb-8">
             <div className="relative flex flex-col md:flex-row items-center md:items-end gap-6 -mt-12 mb-6">
               <div 
@@ -1078,7 +1079,7 @@ const ProfilePage = () => {
             <div className="grid grid-cols-3 gap-4">
               {[
                 { label: 'Active Ads', value: userListingsCount, icon: ShoppingBag, color: 'text-blue-500', bg: 'bg-blue-50' },
-                { label: 'Sold Items', value: '0', icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                { label: 'Sold Items', value: '0', icon: CheckCircle, color: 'text-brand-primary', bg: 'bg-accent-subtle' },
                 { label: 'Rating', value: '5.0', icon: Star, color: 'text-amber-500', bg: 'bg-amber-50' },
               ].map((stat, i) => (
                 <div key={i} className="p-4 rounded-2xl border border-border-main bg-white hover:border-brand-primary transition-colors group cursor-default">
@@ -1252,7 +1253,7 @@ const PublicProfilePage = () => {
                 </button>
 
                 <div className="bg-white rounded-[32px] overflow-hidden border border-border-main shadow-sm relative">
-                    <div className="h-24 bg-gradient-to-r from-brand-primary to-emerald-400 opacity-90"></div>
+                    <div className="h-24 bg-gradient-to-r from-brand-primary to-[#f4a27e] opacity-90"></div>
                     <div className="px-8 pb-8">
                         <div className="relative flex flex-col md:flex-row items-center md:items-end gap-6 -mt-12 mb-6">
                             <div className="w-28 h-28 rounded-3xl bg-white p-1 shadow-xl relative z-10 overflow-hidden">
@@ -1371,7 +1372,7 @@ const VerificationPage = () => {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-bg-light">
         <div className="bg-white p-10 rounded-[40px] border border-border-main shadow-xl max-w-sm w-full space-y-6">
-          <div className="w-24 h-24 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
+          <div className="w-24 h-24 bg-accent-subtle text-brand-primary rounded-full flex items-center justify-center mx-auto shadow-inner">
             <ShieldCheck size={48} />
           </div>
           <div>
@@ -1995,7 +1996,7 @@ const SellPage = () => {
                                 <button 
                                     onClick={() => markAsSold(listing.id)}
                                     disabled={listing.status === 'sold'}
-                                    className="py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                                    className="py-4 bg-brand-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-brand-primary/20 hover:bg-brand-primary-hover disabled:opacity-50 transition-all"
                                 >
                                     <CheckCircle size={16} /> {listing.status === 'sold' ? 'Sold Out' : 'Mark Sold'}
                                 </button>
@@ -2053,8 +2054,8 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         await getDocFromServer(doc(db, 'test', 'connection'));
       } catch (error: any) {
-        if (error.message?.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration.");
+        if (error.message?.includes('the client is offline') || error.message?.includes('Failed to fetch')) {
+          console.error("Firebase connection failed. This might be a network issue or missing configuration.", error);
         }
       }
     };
@@ -2867,7 +2868,6 @@ const ChatItem = ({ chat, currentUserId }: { chat: Chat, currentUserId: string }
     );
 };
 
-import { SpiderCursor } from "@/components/ui/spider-cursor";
 const OnboardingPage = () => {
     const { user, updateProfile, addNotification } = useApp();
     const [step, setStep] = useState(1);
@@ -3221,7 +3221,7 @@ const NotificationOverlay = () => {
                         exit={{ opacity: 0, x: 20, scale: 0.95 }}
                         className={cn(
                             "pointer-events-auto p-4 rounded-2xl border shadow-2xl flex items-start gap-3 backdrop-blur-md",
-                            notif.type === 'success' ? "bg-green-50/90 border-green-200 text-green-800" :
+                            notif.type === 'success' ? "bg-accent-subtle/90 border-brand-primary/20 text-brand-primary" :
                             notif.type === 'error' ? "bg-red-50/90 border-red-200 text-red-800" :
                             "bg-white/90 border-border-main text-text-main"
                         )}

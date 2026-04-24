@@ -151,12 +151,12 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
           <div className={cn(
             "hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all",
             isSupabaseConnected 
-              ? "bg-emerald-50 border-emerald-100 text-emerald-600" 
-              : "bg-gray-50 border-gray-100 text-gray-400 opacity-60"
+               ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary" 
+               : "bg-gray-50 border-gray-100 text-gray-400 opacity-60"
           )}>
             <div className={cn(
               "w-1.5 h-1.5 rounded-full animate-pulse",
-              isSupabaseConnected ? "bg-emerald-500" : "bg-gray-400"
+              isSupabaseConnected ? "bg-brand-primary" : "bg-gray-400"
             )} />
             Supabase Sync {isSupabaseConnected ? 'Active' : 'Offline'}
           </div>
@@ -168,7 +168,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {[
             { label: 'Total Items Sold', value: stats.itemsSold, icon: Package, color: 'text-brand-primary', bg: 'bg-accent-subtle' },
-            { label: 'Total Revenue', value: `₱${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+            { label: 'Total Revenue', value: `₱${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-brand-primary', bg: 'bg-accent-subtle' },
             { label: 'Average Rating', value: stats.avgRating.toFixed(1), icon: Star, color: 'text-amber-500', bg: 'bg-amber-50' },
             { label: 'Active Products', value: stats.activeProducts, icon: ShoppingBag, color: 'text-blue-500', bg: 'bg-blue-50' },
             { label: 'Total Item Views', value: stats.totalViews, icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50' },
@@ -252,7 +252,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
                       <div className="flex items-center gap-2 mb-1">
                         <span className={cn(
                           "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider",
-                          listing.status === 'active' ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"
+                          listing.status === 'active' ? "bg-brand-primary/10 text-brand-primary" : "bg-blue-50 text-blue-600"
                         )}>
                           {listing.status}
                         </span>
@@ -277,7 +277,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
                       {listing.status === 'active' && (
                         <button 
                           onClick={() => onMarkAsSold(listing.id)}
-                          className="flex items-center gap-2 px-4 py-2.5 bg-green-50 text-green-600 rounded-xl text-xs font-black hover:bg-green-100 transition-all"
+                          className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary/10 text-brand-primary rounded-xl text-xs font-black hover:bg-brand-primary/20 transition-all"
                         >
                           <CheckCircle2 size={16} /> Mark Sold
                         </button>

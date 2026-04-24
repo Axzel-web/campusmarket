@@ -66,15 +66,22 @@ const HomeBackground = () => {
     // Add a gradient HDR background
     const hdrEquirect = new RGBELoader()
       .setPath("https://miroleon.github.io/daily-assets/")
-      .load("GRADIENT_01_01_comp.hdr", function (texture) {
-        texture.mapping = THREE.EquirectangularReflectionMapping;
-      });
+      .load("GRADIENT_01_01_comp.hdr", 
+        function (texture) {
+          texture.mapping = THREE.EquirectangularReflectionMapping;
+          scene.environment = texture;
+        },
+        undefined,
+        (err) => console.warn("Failed to load HDR background:", err)
+      );
 
-    scene.environment = hdrEquirect;
     scene.fog = new THREE.FogExp2(0x11151c, 0.4);
 
     const surfaceImperfection = new THREE.TextureLoader().load(
-      "https://miroleon.github.io/daily-assets/surf_imp_02.jpg"
+      "https://miroleon.github.io/daily-assets/surf_imp_02.jpg",
+      undefined,
+      undefined,
+      (err) => console.warn("Failed to load surface imperfection texture:", err)
     );
     surfaceImperfection.wrapT = THREE.RepeatWrapping;
     surfaceImperfection.wrapS = THREE.RepeatWrapping;
@@ -114,7 +121,9 @@ const HomeBackground = () => {
         const scalar = window.innerWidth < 768 ? 0.035 : 0.05;
         object.scale.setScalar(scalar);
         scene.add(object);
-      }
+      },
+      undefined,
+      (err) => console.warn("Failed to load hand model:", err)
     );
 
     // POST PROCESSING
@@ -166,7 +175,9 @@ const HomeBackground = () => {
       "https://raw.githubusercontent.com/miroleon/displacement_texture_freebie/main/assets/1K/jpeg/normal/ml-dpt-21-1K_normal.jpeg",
       function (texture) {
         texture.minFilter = THREE.NearestFilter;
-      }
+      },
+      undefined,
+      (err) => console.warn("Failed to load displacement texture:", err)
     );
 
     const displacementPass = new ShaderPass(displacementShader);
@@ -864,12 +875,76 @@ export const LandingPage: React.FC = () => {
 
         @media screen and (max-width: 900px) {
            .about-grid { grid-template-columns: 1fr; gap: 2rem; }
+           .features-grid { grid-template-columns: 1fr !important; }
            .main-section { 
              padding: 100px 1.5rem 2rem; 
              min-height: 100vh;
              justify-content: flex-start;
            }
            .section-tag { margin-bottom: 0.5rem; margin-top: 2rem; }
+        }
+
+        .about-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 4rem;
+          margin-top: 4rem;
+          align-items: center;
+        }
+
+        .pill-image {
+          width: 100%;
+          border-radius: 40px;
+          aspect-ratio: 4/5;
+          object-fit: cover;
+          box-shadow: 0 30px 60px -10px rgba(0,0,0,0.15);
+        }
+
+        .features-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 2rem;
+          margin-top: 4rem;
+        }
+
+        .feature-card {
+           background: rgba(255,255,255,0.7);
+           backdrop-filter: blur(20px);
+           -webkit-backdrop-filter: blur(20px);
+           padding: 2.5rem;
+           border-radius: 32px;
+           border: 1px solid rgba(0,0,0,0.03);
+           transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        .feature-card:hover {
+           transform: translateY(-12px) scale(1.02);
+           background: white;
+           box-shadow: 0 40px 80px -20px rgba(0,0,0,0.1);
+        }
+
+        .feature-card img {
+          width: 100%;
+          aspect-ratio: 16/10;
+          object-fit: cover;
+          border-radius: 20px;
+          margin-bottom: 2rem;
+        }
+
+        .feature-card h4 {
+           font-family: 'Inter', sans-serif;
+           font-weight: 800;
+           font-size: 1.25rem;
+           margin-bottom: 0.75rem;
+           letter-spacing: -0.02em;
+        }
+
+        .feature-card p {
+           font-size: 0.9rem;
+           opacity: 0.6;
+           line-height: 1.6;
+           font-family: 'Inter', sans-serif;
         }
 
         @media screen and (max-width: 600px) {
@@ -1015,7 +1090,7 @@ export const LandingPage: React.FC = () => {
 
       {/* NAVIGATION BAR */}
       <nav className="landing-nav">
-        <Link to="/" className="text-base font-black tracking-tighter" style={{ textDecoration: 'none', color: '#00332c', alignSelf: 'center' }}>CAMPUSMARKET.</Link>
+        <Link to="/" className="text-base font-black tracking-tighter" style={{ textDecoration: 'none', color: '#221F1E', alignSelf: 'center' }}>CAMPUSMARKET.</Link>
         <div className="nav-links">
           <a href="#home">Home</a>
           <a href="#about">About</a>
@@ -1057,72 +1132,91 @@ export const LandingPage: React.FC = () => {
 
       {/* ABOUT SECTION */}
       <section id="about" className="main-section bg-[#c5c0bc]">
-         <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-         >
-            <span className="section-tag">The Story</span>
-            <h2 className="text-5xl font-bold tracking-tight">Built by students,<br/>for the community.</h2>
-         </motion.div>
-         
          <div className="about-grid">
-            <motion.div 
-               className="space-y-6"
-               initial={{ opacity: 0, x: -20 }}
-               whileInView={{ opacity: 1, x: 0 }}
+            <motion.div
+               initial={{ opacity: 0, scale: 0.95 }}
+               whileInView={{ opacity: 1, scale: 1 }}
                viewport={{ once: true }}
-               transition={{ duration: 0.8, delay: 0.2 }}
+               transition={{ duration: 1 }}
             >
-               <p className="text-lg leading-relaxed">CampusMarket was founded with a singular purpose: to eliminate the friction in university second-hand commerce. We saw students struggling with shipping fees and shady meetups, so we built something better.</p>
+               <img 
+                  src="https://picsum.photos/seed/campusLife/800/1000" 
+                  alt="Students on campus" 
+                  className="pill-image"
+                  referrerPolicy="no-referrer"
+               />
             </motion.div>
-            <motion.div 
-               className="space-y-6"
-               initial={{ opacity: 0, x: 20 }}
-               whileInView={{ opacity: 1, x: 0 }}
-               viewport={{ once: true }}
-               transition={{ duration: 0.8, delay: 0.3 }}
-            >
-               <p className="text-lg leading-relaxed">By restricting access to verified university emails, we ensure every person you meet is a peer. It's a high-trust, low-impact way to keep gear in use and money in student pockets.</p>
-            </motion.div>
+            
+            <div>
+               <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8 }}
+               >
+                  <span className="section-tag">The Story</span>
+                  <h2 className="text-5xl font-bold tracking-tight">Built by students,<br/>for the community.</h2>
+                  
+                  <div className="mt-8 space-y-6">
+                     <p className="text-lg leading-relaxed">CampusMarket was founded with a singular purpose: to eliminate the friction in university second-hand commerce. We saw students struggling with shipping fees and shady meetups, so we built something better.</p>
+                     <p className="text-lg leading-relaxed">By restricting access to verified university emails, we ensure every person you meet is a peer. It's a high-trust, low-impact way to keep gear in use and money in student pockets.</p>
+                     
+                     <div className="pt-6 grid grid-cols-2 gap-8">
+                        <div>
+                           <h4 className="font-black text-3xl">12k+</h4>
+                           <p className="text-sm uppercase tracking-widest opacity-50 font-sans">Active Users</p>
+                        </div>
+                        <div>
+                           <h4 className="font-black text-3xl">45k</h4>
+                           <p className="text-sm uppercase tracking-widest opacity-50 font-sans">Items Traded</p>
+                        </div>
+                     </div>
+                  </div>
+               </motion.div>
+            </div>
          </div>
       </section>
 
       {/* FEATURES SECTION */}
-      <section id="features" className="main-section">
-         <motion.span 
-            className="section-tag"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-         >
-            Capabilities
-         </motion.span>
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-16 mt-12">
+      <section id="features" className="main-section bg-[#D0CBC7]">
+         <div className="text-center mb-12">
+            <span className="section-tag">Platform Features</span>
+            <h2 className="text-5xl font-bold">Everything you need<br/>to trade locally.</h2>
+         </div>
+
+         <div className="features-grid">
             {[
                {
-                  title: "Zero Friction",
-                  desc: "No packing tape, no post office. Just walk to the student union and exchange items between classes."
+                  img: "https://picsum.photos/seed/ai-listing/800/500",
+                  title: "AI Listing Craft",
+                  desc: "Our intelligent system generates descriptive listings from just a few fragments. No more writer's block when selling your old textbooks."
                },
                {
-                  title: "AI Listings",
-                  desc: "Our Gemini integration crafts expert descriptions from a few words. Listing an item takes under 30 seconds."
+                  img: "https://picsum.photos/seed/campus-trust/800/500",
+                  title: "Secure Peer ID",
+                  desc: "Every account is tied to a verified university email. Our multi-step verification process ensures the person you're meeting is exactly who they say they are."
                },
                {
-                  title: "Verified ID",
-                  desc: "Every user is authenticated against university records. Safety isn't optional—it's built in."
+                  img: "https://picsum.photos/seed/green-trade/800/500",
+                  title: "Zero Packaging",
+                  desc: "Since all trades happen on campus, there's no need for boxes, plastic wrap, or carbon-heavy shipping. It's the greenest way to shop."
                }
             ].map((feature, i) => (
                <motion.div 
                   key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                  className="feature-card"
+                  initial={{ opacity: 0, y: 40, scale: 0.95 }}
+                  whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                  viewport={{ once: true, margin: "-100px" }}
+                  transition={{ 
+                     duration: 0.8, 
+                     delay: i * 0.15,
+                     ease: [0.16, 1, 0.3, 1]
+                  }}
                >
-                  <h3 className="text-3xl font-bold italic mb-4">{feature.title}</h3>
-                  <p className="opacity-60 text-sm">{feature.desc}</p>
+                  <img src={feature.img} alt={feature.title} referrerPolicy="no-referrer" />
+                  <h4>{feature.title}</h4>
+                  <p>{feature.desc}</p>
                </motion.div>
             ))}
          </div>

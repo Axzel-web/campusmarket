@@ -10,14 +10,14 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-hind: "Hind Siliguri", sans-serif;
 
-  /* Mint Green & Student-First Palette */
-  --color-bg-light: #f9fafb;
-  --color-brand-primary: #10b981;
-  --color-brand-primary-hover: #059669;
-  --color-text-main: #064e3b;
+  /* Onboarding Inspired Palette */
+  --color-bg-light: #fdfaf9;
+  --color-brand-primary: #EF895F;
+  --color-brand-primary-hover: #D9734A;
+  --color-text-main: #221F1E;
   --color-text-muted: #6b7280;
   --color-border-main: #e5e7eb;
-  --color-accent-subtle: #ecfdf5;
+  --color-accent-subtle: #F5E8E2;
   --color-accent-yellow: #fffdf2;
   --color-border-yellow: #fde68a;
 
@@ -39,7 +39,7 @@
 }
 
 .campus-gradient {
-  background: linear-gradient(135deg, #10b981, #14b8a6);
+  background: linear-gradient(135deg, #EF895F, #f4a27e);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -58,7 +58,7 @@
 .uiverse-card {
   --uiverse-white: hsl(0, 0%, 100%);
   --uiverse-black: hsl(240, 15%, 9%);
-  --uiverse-primary: hsl(161, 92%, 48%); /* Using campus green */
+  --uiverse-primary: #EF895F; /* Using onboarding orange */
   
   position: relative;
   overflow: hidden;

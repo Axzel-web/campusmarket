@@ -15,8 +15,8 @@ function getAI() {
 
 export async function generateListingDetails(shortDescription: string) {
   try {
-    const model = getAI();
-    const response = await model.models.generateContent({
+    const ai = getAI();
+    const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Generate a product listing based on this short description: "${shortDescription}". 
       The goal is to help a student sell this on a campus marketplace.`,
@@ -40,9 +40,18 @@ export async function generateListingDetails(shortDescription: string) {
       }
     });
 
-    return JSON.parse(response.text);
-  } catch (error) {
-    console.error("AI Generation Error:", error);
-    throw new Error("Failed to generate listing details");
+    return JSON.parse(response.text || '{}');
+  } catch (error: any) {
+    console.error("AI Generation Error Detailed:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
+    if (error.message?.includes('Failed to fetch')) {
+       throw new Error("Network error: Could not reach the AI service. Please check your internet connection.");
+    }
+    
+    throw new Error("Failed to generate listing details: " + (error.message || "Unknown error"));
   }
 }
