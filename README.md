@@ -137,6 +137,4 @@ Group 4
 
 ---
 
-📄 License
 
-MIT License
