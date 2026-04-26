@@ -15,6 +15,8 @@ import { Menu, X } from 'lucide-react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { motion } from 'motion/react';
+import { MarketplacePreview } from './MarketplacePreview';
+import { Footer } from './Footer';
 
 /**
  * LandingPage component: A faithful reconstruction of the original airplane guide landing page.
@@ -902,9 +904,15 @@ export const LandingPage: React.FC = () => {
 
         .features-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(1, 1fr);
           gap: 2rem;
           margin-top: 4rem;
+        }
+
+        @media (min-width: 768px) {
+          .features-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
         }
 
         .feature-card {
@@ -1082,10 +1090,11 @@ export const LandingPage: React.FC = () => {
 
       <div className={`mobile-menu ${isMenuOpen ? 'open' : ''}`}>
         <a href="#home" onClick={() => setIsMenuOpen(false)}>Home</a>
-        <a href="#about" onClick={() => setIsMenuOpen(false)}>About</a>
+        <Link to="/about" onClick={() => setIsMenuOpen(false)}>The Story</Link>
         <a href="#features" onClick={() => setIsMenuOpen(false)}>Features</a>
         <a href="#how-it-works" onClick={() => setIsMenuOpen(false)}>Process</a>
-        <a href="#contact" onClick={() => setIsMenuOpen(false)}>Contact</a>
+        <Link to="/contact" onClick={() => setIsMenuOpen(false)}>Contact</Link>
+        <Link to="/privacy" onClick={() => setIsMenuOpen(false)}>Privacy</Link>
       </div>
 
       {/* NAVIGATION BAR */}
@@ -1093,10 +1102,10 @@ export const LandingPage: React.FC = () => {
         <Link to="/" className="text-base font-black tracking-tighter" style={{ textDecoration: 'none', color: '#221F1E', alignSelf: 'center' }}>CAMPUSMARKET.</Link>
         <div className="nav-links">
           <a href="#home">Home</a>
-          <a href="#about">About</a>
+          <Link to="/about">The Story</Link>
           <a href="#features">Features</a>
           <a href="#how-it-works">How It Works</a>
-          <a href="#contact">Contact</a>
+          <Link to="/contact">Contact</Link>
         </div>
         
         <div className="flex items-center gap-2">
@@ -1175,6 +1184,10 @@ export const LandingPage: React.FC = () => {
                   desc: "Every account is tied to a verified university email. Our multi-step verification process ensures the person you're meeting is exactly who they say they are."
                },
                {
+                  title: "AI Listing Power",
+                  desc: "Draft items in seconds. Our intelligent assistant helps you craft effective descriptions and prices based on campus trends, so you can focus on your studies."
+               },
+               {
                   title: "Zero Packaging",
                   desc: "Since all trades happen on campus, there's no need for boxes, plastic wrap, or carbon-heavy shipping. It's the greenest way to shop."
                }
@@ -1198,8 +1211,55 @@ export const LandingPage: React.FC = () => {
          </div>
       </section>
 
-      {/* HOW IT WORKS SECTION (WRAPPED EXISTING CONTENT) */}
-      <section id="how-it-works" className="w-full">
+      {/* MARKETPLACE PREVIEW SECTION - MANDATORY FOR ADSENSE APPROVAL */}
+      <MarketplacePreview />
+
+      {/* HOW IT WORKS SECTION */}
+      <section id="how-it-works" className="py-32 px-6 bg-white/20">
+         <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-20">
+               <span className="section-tag">Smooth Process</span>
+               <h2 className="text-5xl font-black text-[#221F1E] tracking-tighter">How CampusMarket Works</h2>
+               <p className="mt-4 text-[#221F1E]/60 font-medium">Three simple steps to better student trading.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+               {[
+                  {
+                     step: "01",
+                     title: "Browse & Discover",
+                     desc: "Log in with your university email to see hundreds of listings from students right on your campus. Sort by category, price, or condition."
+                  },
+                  {
+                     step: "02",
+                     title: "Secure Connect",
+                     desc: "Chat directly with the seller inside our platform. Ask questions, request more photos, and agree on a safe campus meetup spot."
+                  },
+                  {
+                     step: "03",
+                     title: "Direct Trade",
+                     desc: "Meet on campus—usually at the Student Union or a library—to inspect the item and finalize the deal. No shipping, no wait, no fees."
+                  }
+               ].map((item, i) => (
+                  <motion.div 
+                     key={i}
+                     initial={{ opacity: 0, y: 20 }}
+                     whileInView={{ opacity: 1, y: 0 }}
+                     viewport={{ once: true }}
+                     transition={{ delay: i * 0.1 }}
+                     className="relative p-10 bg-white/40 rounded-[40px] border border-black/5"
+                  >
+                     <span className="text-5xl font-black text-[#EF895F]/20 absolute top-8 right-10">{item.step}</span>
+                     <h3 className="text-2xl font-black text-[#221F1E] mb-4 tracking-tight">{item.title}</h3>
+                     <p className="text-[#221F1E]/60 text-sm leading-relaxed font-medium">{item.desc}</p>
+                  </motion.div>
+               ))}
+            </div>
+         </div>
+      </section>
+
+      {/* EXPERIENCE SECTION (THE AIRPLANE) */}
+      <section id="journey" className="w-full">
          <div className="landing-content" ref={containerRef}>
             {/* The airplane/three.js interaction content (UNCHANGED IN STRUCTURE) */}
             <div className="trigger"></div>
@@ -1269,30 +1329,8 @@ export const LandingPage: React.FC = () => {
          </div>
       </section>
 
-      {/* CONTACT SECTION */}
-      <section id="contact" className="main-section bg-black text-white h-auto min-h-[60vh] py-32 overflow-hidden">
-          <div className="relative z-10">
-             <span className="section-tag opacity-30 text-white">Reach Out</span>
-             <h2 className="text-6xl font-bold mb-16 tracking-tighter">Connect with the campus community.</h2>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-24 font-sans uppercase tracking-[0.2em] text-xs font-black">
-                <div>
-                   <p className="opacity-40 mb-4">Email Support</p>
-                   <p className="text-lg tracking-normal normal-case font-serif italic text-white/80">support@campusmarket.edu</p>
-                </div>
-                <div>
-                   <p className="opacity-40 mb-4">University Relations</p>
-                   <p className="text-lg tracking-normal normal-case font-serif italic text-white/80">admin@campusmarket.edu</p>
-                </div>
-             </div>
-             <div className="mt-40 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 opacity-40 text-[10px] uppercase tracking-widest font-sans">
-                <p>Campus Market &copy; 2026 All Rights Reserved</p>
-                <div className="flex gap-8">
-                   <a href="#" className="text-white hover:text-brand-primary transition-colors">Privacy Policy</a>
-                   <a href="#" className="text-white hover:text-brand-primary transition-colors">Terms of Service</a>
-                </div>
-             </div>
-          </div>
-      </section>
+      {/* FOOTER */}
+      <Footer />
     </div>
   );
 };

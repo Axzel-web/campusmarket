@@ -41,6 +41,9 @@ import { uploadAvatar, uploadStudentId, syncUserProfileToSupabase } from './serv
 import { LandingPage } from './components/LandingPage';
 import { SellerDashboard } from './components/SellerDashboard';
 import { LoadingAnimation } from './components/LoadingAnimation';
+import { AboutPage } from './components/AboutPage';
+import { ContactPage } from './components/ContactPage';
+import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { supabase } from './lib/supabase';
 import { uploadProductImage } from './services/productService';
 
@@ -3281,6 +3284,9 @@ const AppContent = () => {
                 <Route path="/onboarding" element={
                   user ? <OnboardingPage /> : <Navigate to="/login" replace />
                 } />
+                <Route path="/about" element={<AboutPage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route path="/privacy" element={<PrivacyPolicyPage />} />
                 <Route path="/*" element={
                   <ProtectedRoute>
                     <div className="min-h-screen bg-bg-light font-sans pt-16">
