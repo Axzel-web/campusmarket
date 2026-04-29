@@ -31,10 +31,11 @@ import {
   AlertCircle,
   X,
   Trash2,
-  CheckCircle
+  CheckCircle,
+  Zap
 } from 'lucide-react';
 import { SpiderCursor } from "./components/ui/spider-cursor";
-import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication } from './types';
+import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication, Transaction } from './types';
 import { cn, compressImage } from './lib/utils';
 import { generateListingDetails } from './services/geminiService';
 import { uploadAvatar, uploadStudentId, syncUserProfileToSupabase } from './services/userService';
@@ -46,6 +47,7 @@ import { ContactPage } from './components/ContactPage';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { supabase } from './lib/supabase';
 import { uploadProductImage } from './services/productService';
+import { SpotlightTutorial } from './components/SpotlightTutorial';
 
 import { 
   onAuthStateChanged, 
@@ -130,6 +132,7 @@ interface AppContextType {
   reviews: Review[];
   chats: Chat[];
   messages: ChatMessage[];
+  transactions: Transaction[];
   search: string;
   listingsLoading: boolean;
   setSearch: (query: string) => void;
@@ -145,6 +148,8 @@ interface AppContextType {
   sendMessage: (chatId: string, text: string) => void;
   deleteMessage: (chatId: string, messageId: string) => Promise<void>;
   deleteChat: (chatId: string) => Promise<void>;
+  createTransaction: (listing: Listing, paymentMethod: Transaction['paymentMethod']) => Promise<string | undefined>;
+  updateTransactionStatus: (transactionId: string, status: Transaction['status']) => Promise<void>;
   replyToReview: (reviewId: string, text: string) => void;
   archiveReview: (reviewId: string) => void;
   reportReview: (reviewId: string, reason: string) => void;
@@ -171,12 +176,27 @@ export const useApp = () => {
 const Navbar = () => {
   const { user, search, setSearch } = useApp();
   const [showSearch, setShowSearch] = useState(false);
+  const [localSearch, setLocalSearch] = useState(search);
   const location = useLocation();
+
+  // Handle debouncing search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(localSearch);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [localSearch, setSearch]);
+
+  // Sync local search if search state is updated externally
+  useEffect(() => {
+    setLocalSearch(search);
+  }, [search]);
 
   if (!user) return null;
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-border-main z-50">
+    <header id="navbar" className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-border-main z-50">
       <div className="max-w-[1280px] mx-auto h-full flex items-center px-4 md:px-6 justify-between">
         <div className="flex items-center gap-4 md:gap-8 flex-1">
           {!showSearch && (
@@ -190,11 +210,11 @@ const Navbar = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
             <input 
               type="text" 
-              placeholder="Search items..." 
-              value={search}
+              placeholder="Search items or sellers..." 
+              value={localSearch}
               autoFocus={showSearch}
-              onBlur={() => search === '' && setShowSearch(false)}
-              onChange={(e) => setSearch(e.target.value)}
+              onBlur={() => localSearch === '' && setShowSearch(false)}
+              onChange={(e) => setLocalSearch(e.target.value)}
               className="w-full h-10 pl-10 pr-4 bg-bg-light rounded-full border border-border-main focus:outline-none focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all text-sm"
             />
           </div>
@@ -243,7 +263,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <aside className="w-[240px] bg-white border-r border-border-main p-6 sticky top-16 h-[calc(100vh-64px)] hidden md:flex flex-col flex-shrink-0">
+    <aside id="sidebar-nav" className="w-[240px] bg-white border-r border-border-main p-6 sticky top-16 h-[calc(100vh-64px)] hidden md:flex flex-col flex-shrink-0">
       <nav className="flex-1">
         {navItems.map(({ icon: Icon, label, path }) => (
           <Link
@@ -358,7 +378,7 @@ const RightPanel = () => {
   return (
     <aside className="w-[300px] bg-white border-l border-border-main p-6 sticky top-16 h-[calc(100vh-64px)] hidden lg:flex flex-col gap-6 overflow-y-auto flex-shrink-0 no-scrollbar">
       {/* Seller Hub / Verification Widget */}
-      <div className={cn(
+      <div id="seller-hub-widget" className={cn(
         "rounded-xl p-4 border",
         user?.isVerified ? "bg-white border-border-main" : 
         user?.verificationStatus === 'pending' ? "bg-amber-50 border-amber-200" :
@@ -448,6 +468,11 @@ const ListingCard = ({ listing }: { listing: Listing }) => {
     >
       <Link to={`/listing/${listing.id}`} className="flex-1 flex flex-col">
         <div className="relative aspect-[4/3] overflow-hidden bg-bg-light">
+          {listing.isFeatured && (
+            <div className="absolute top-2 left-2 px-2 py-1 bg-amber-400 text-white text-[8px] font-black uppercase tracking-[0.2em] rounded-lg shadow-lg z-10 flex items-center gap-1">
+                <Sparkles size={8} fill="currentColor" /> Featured
+            </div>
+          )}
           {listing.images.length > 0 ? (
             <img 
               src={listing.images[0]} 
@@ -513,7 +538,7 @@ const MobileTabs = () => {
   const activeIndex = navItems.findIndex(item => item.path === location.pathname);
 
   return (
-    <div className="md:hidden fixed bottom-2 left-0 right-0 z-50 flex justify-center px-4 pb-safe pointer-events-none">
+    <div id="mobile-tabs" className="md:hidden fixed bottom-2 left-0 right-0 z-50 flex justify-center px-4 pb-safe pointer-events-none">
       <div className="relative w-full max-w-[440px] h-16 bg-white shadow-[0_-5px_25px_rgba(0,0,0,0.08)] rounded-3xl flex pointer-events-auto overflow-visible">
         {/* Magic Indicator */}
         <motion.div 
@@ -533,6 +558,7 @@ const MobileTabs = () => {
           const isActive = location.pathname === path;
           return (
             <Link 
+              id={idx === 1 ? "sell-tab" : undefined}
               key={path} 
               to={path}
               className="relative z-10 flex-1 h-full flex flex-col items-center justify-center"
@@ -640,9 +666,21 @@ const HomePage = () => {
   
   const categories = ['All', 'Gadgets', 'Books', 'Uniforms', 'Services', 'Others'];
 
+  const matchedSellers = React.useMemo(() => {
+    if (!search || search.length < 2) return [];
+    const uniqueSellers = new Map<string, {id: string, name: string, avatar?: string}>();
+    listings.forEach(l => {
+      if (l.sellerName.toLowerCase().includes(search.toLowerCase())) {
+        uniqueSellers.set(l.sellerId, {id: l.sellerId, name: l.sellerName, avatar: l.sellerAvatar});
+      }
+    });
+    return Array.from(uniqueSellers.values());
+  }, [listings, search]);
+
   const filteredListings = listings.filter(l => {
     const matchesSearch = l.title.toLowerCase().includes(search.toLowerCase()) ||
-                          l.category.toLowerCase().includes(search.toLowerCase());
+                          l.category.toLowerCase().includes(search.toLowerCase()) ||
+                          l.sellerName.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = activeCategory === 'All' || l.category === activeCategory;
     
     // Price Filter
@@ -765,7 +803,32 @@ const HomePage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
+      {search.length >= 2 && matchedSellers.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-[11px] font-bold text-text-muted uppercase tracking-widest mb-4">Users Found</h3>
+          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+            {matchedSellers.map(seller => (
+              <Link 
+                key={seller.id} 
+                to={`/profile/${seller.id}`}
+                className="flex-shrink-0 flex flex-col items-center gap-2 group"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-accent-subtle border border-border-main flex items-center justify-center text-brand-primary text-xl font-black group-hover:border-brand-primary group-hover:shadow-lg transition-all overflow-hidden">
+                  {seller.avatar ? (
+                    <img src={seller.avatar} alt={seller.name} className="w-full h-full object-cover" />
+                  ) : (
+                    seller.name[0]
+                  )}
+                </div>
+                <span className="text-[10px] font-bold text-text-main truncate w-16 text-center">{seller.name}</span>
+              </Link>
+            ))}
+          </div>
+          <div className="h-px bg-border-main w-full mb-2 opacity-50"></div>
+        </div>
+      )}
+
+      <div id="market-grid" className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
         {listingsLoading ? (
             Array(6).fill(0).map((_, i) => <ListingSkeleton key={i} />)
         ) : filteredListings.length > 0 ? (
@@ -994,6 +1057,15 @@ const ProfilePage = () => {
 
   const userListingsCount = listings.filter(l => l.sellerId === user.id).length;
 
+  const settingsItems = [
+    { icon: User, label: 'Edit Profile Settings', path: '/edit-profile', desc: 'Update your personal info' },
+    { icon: Sparkles, label: 'Redo Onboarding', path: '#', onClick: () => { localStorage.removeItem('campusListingTutorialSeen'); navigate('/onboarding'); }, desc: 'Re-run the welcome induction' },
+    { icon: Zap, label: 'View App Tutorial', path: '#', onClick: () => { localStorage.removeItem('campusListingTutorialSeen'); navigate('/market'); }, desc: 'Show the spotlight highlights again' },
+    { icon: Heart, label: 'Manage Favorites', path: '/favorites', desc: 'Items you have saved' },
+    { icon: ShoppingBag, label: 'Transaction History', path: '/purchases', desc: 'Your orders and sales' },
+    { icon: ShieldCheck, label: 'Privacy & Security', path: '/settings', desc: 'Account protection' },
+  ];
+
   return (
     <div className="flex-1 px-4 py-8 overflow-y-auto no-scrollbar bg-[#f8fafc]">
       <div className="max-w-3xl mx-auto space-y-6 pb-20">
@@ -1161,32 +1233,49 @@ const ProfilePage = () => {
         <div className="pt-4">
           <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] pl-4 mb-4">Account Settings</h3>
           <div className="grid grid-cols-1 gap-2">
-            {[
-              { icon: User, label: 'Edit Profile Settings', path: '/edit-profile', desc: 'Update your personal info' },
-              { icon: Sparkles, label: 'Redo Onboarding', path: '/onboarding', desc: 'Re-run the welcome induction' },
-              { icon: Heart, label: 'Manage Favorites', path: '/favorites', desc: 'Items you have saved' },
-              { icon: ShoppingBag, label: 'Transaction History', path: '/purchases', desc: 'Your orders and sales' },
-              { icon: ShieldCheck, label: 'Privacy & Security', path: '/settings', desc: 'Account protection' },
-            ].map(({ icon: Icon, label, path, desc }) => (
-              <Link 
-                key={path}
-                to={path}
-                className="flex items-center justify-between p-4 bg-white rounded-2xl border border-border-main hover:border-brand-primary group transition-all"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-xl bg-bg-light flex items-center justify-center text-text-muted group-hover:bg-brand-primary group-hover:text-white transition-all shadow-sm">
-                    <Icon size={20} />
+            {settingsItems.map(({ icon: Icon, label, path, desc, onClick }) => {
+              const content = (
+                <>
+                  <div className="flex items-center gap-4">
+                    <div className="w-11 h-11 rounded-xl bg-bg-light flex items-center justify-center text-text-muted group-hover:bg-brand-primary group-hover:text-white transition-all shadow-sm">
+                      <Icon size={20} />
+                    </div>
+                    <div className="text-left">
+                      <span className="font-black text-text-main text-sm block leading-none mb-1">{label}</span>
+                      <span className="text-[10px] text-text-muted font-medium">{desc}</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-black text-text-main text-sm block leading-none mb-1">{label}</span>
-                    <span className="text-[10px] text-text-muted font-medium">{desc}</span>
+                  <div className="w-8 h-8 rounded-lg bg-bg-light flex items-center justify-center text-text-muted opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-0 -translate-x-2">
+                    <ChevronRight size={14} />
                   </div>
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-bg-light flex items-center justify-center text-text-muted opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-0 -translate-x-2">
-                  <ChevronRight size={14} />
-                </div>
-              </Link>
-            ))}
+                </>
+              );
+
+              if (onClick) {
+                return (
+                  <button 
+                    key={label}
+                    onClick={onClick}
+                    className={cn(
+                      "flex w-full items-center justify-between p-4 bg-white rounded-2xl border border-border-main hover:border-brand-primary group transition-all cursor-pointer",
+                      label === "View App Tutorial" && "hidden lg:flex"
+                    )}
+                  >
+                    {content}
+                  </button>
+                );
+              }
+
+              return (
+                <Link 
+                  key={path}
+                  to={path}
+                  className="flex items-center justify-between p-4 bg-white rounded-2xl border border-border-main hover:border-brand-primary group transition-all"
+                >
+                  {content}
+                </Link>
+              );
+            })}
           </div>
 
           {/* Developer Reset - Hidden for normal users */}
@@ -1555,6 +1644,7 @@ const SellPage = () => {
     quantity: '1',
     location: '',
     contactMethod: '',
+    isFeatured: false,
     tags: [] as string[]
   });
 
@@ -1626,6 +1716,7 @@ const SellPage = () => {
       quantity: Number(formData.quantity),
       location: formData.location,
       contactMethod: formData.contactMethod,
+      isFeatured: formData.isFeatured,
       tags: formData.tags,
       images: [] // images handled inside addListing
     }, imageFiles);
@@ -1773,6 +1864,44 @@ const SellPage = () => {
           </div>
         </div>
 
+        {/* Monetization & Feature */}
+        <div className="bg-white p-6 md:p-8 rounded-3xl border border-border-main shadow-sm space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-black text-text-main uppercase tracking-tight">Boost Your Listing</h3>
+              <p className="text-[10px] text-text-muted font-bold mt-1">Featured products appear at the top of the marketplace.</p>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setFormData({...formData, isFeatured: !formData.isFeatured})}
+              className={cn(
+                "w-12 h-6 rounded-full transition-all relative",
+                formData.isFeatured ? "bg-brand-primary" : "bg-border-main"
+              )}
+            >
+              <div className={cn(
+                "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                formData.isFeatured ? "right-1" : "left-1"
+              )} />
+            </button>
+          </div>
+
+          <div className="pt-6 border-t border-border-main/50 space-y-3">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-text-muted font-bold">List Price</span>
+              <span className="text-text-main font-black">₱{Number(formData.price || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-text-muted font-bold">Platform Fee (5%)</span>
+              <span className="text-red-500 font-bold">-₱{(Number(formData.price || 0) * 0.05).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center pt-3 border-t border-dashed border-border-main text-base">
+              <span className="text-text-main font-black">You'll Receive</span>
+              <span className="text-brand-primary font-black">₱{(Number(formData.price || 0) * 0.95).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
         <button 
           type="submit"
           disabled={loading}
@@ -1794,14 +1923,15 @@ const SellPage = () => {
 
   const ListingDetail = () => {
     const { id } = useParams<{ id: string }>();
-    const { listings, user, favorites, toggleFavorite, createChat, deleteListing, markAsSold } = useApp();
+    const { listings, user, favorites, toggleFavorite, createChat, deleteListing, markAsSold, createTransaction } = useApp();
     const navigate = useNavigate();
     const listing = listings.find(l => l.id === id);
     const [activeImageIndex, setActiveImageIndex] = useState(0);
+    const [buying, setBuying] = useState(false);
     const isFavorite = listing ? favorites.includes(listing.id) : false;
   
     useEffect(() => {
-      if (id && user && listing && listing.sellerId !== user.id) {
+      if (id && user && listing) {
         // Increment views
         const listingRef = doc(db, 'listings', id);
         updateDoc(listingRef, {
@@ -1809,6 +1939,31 @@ const SellPage = () => {
         }).catch(console.error);
       }
     }, [id, user?.id]);
+
+    const handleBuy = async () => {
+        if (!listing) return;
+        
+        const fee = listing.price * 0.05;
+        const sellerGets = listing.price - fee;
+
+        if (!window.confirm(
+            `Transaction Breakdown:\n\n` +
+            `Product Price: ₱${listing.price.toLocaleString()}\n` +
+            `Platform Fee (5%): ₱${fee.toLocaleString()}\n` +
+            `Seller Receives: ₱${sellerGets.toLocaleString()}\n\n` +
+            `Are you sure you want to commit to buying "${listing.title}"?`
+        )) return;
+        
+        setBuying(true);
+        try {
+            const tid = await createTransaction(listing, 'cash_on_meetup');
+            if (tid) {
+                navigate('/purchases');
+            }
+        } finally {
+            setBuying(false);
+        }
+    };
   
     if (!listing) return null;
 
@@ -1967,12 +2122,26 @@ const SellPage = () => {
 
                 <div className="mt-auto pt-10">
                     {user?.id !== listing.sellerId ? (
-                        <button 
-                            onClick={handleMessage}
-                            className="w-full py-5 bg-brand-primary text-white rounded-[24px] font-black text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl shadow-brand-primary/25 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                        >
-                            <MessageSquare size={20} /> Chat & Inquire
-                        </button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button 
+                                onClick={handleMessage}
+                                className="w-full py-5 bg-white border-2 border-brand-primary text-brand-primary rounded-[24px] font-black text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-sm hover:bg-bg-light active:scale-[0.98] transition-all"
+                            >
+                                <MessageSquare size={20} /> Chat First
+                            </button>
+                            <button 
+                                onClick={handleBuy}
+                                disabled={buying || listing.status === 'sold'}
+                                className="w-full py-5 bg-brand-primary text-white rounded-[24px] font-black text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl shadow-brand-primary/25 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+                            >
+                                {buying ? (
+                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                    <ShoppingBag size={20} />
+                                )}
+                                {listing.status === 'sold' ? 'Sold Out' : 'Buy Now'}
+                            </button>
+                        </div>
                     ) : (
                         <div className="space-y-4">
                             <div className="p-4 bg-amber-50 border border-amber-200 rounded-3xl flex items-start gap-4">
@@ -2033,6 +2202,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [sellerApplication, setSellerApplication] = useState<SellerApplication | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages] = useState<ChatMessage[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [listingsLoading, setListingsLoading] = useState(true);
@@ -2135,7 +2305,15 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
         id: d.id, 
         createdAt: toMillis(d.data().createdAt) 
       } as Listing));
-      setListings(data);
+      
+      // Prioritize featured listings
+      const sortedData = [...data].sort((a, b) => {
+        if (a.isFeatured && !b.isFeatured) return -1;
+        if (!a.isFeatured && b.isFeatured) return 1;
+        return 0;
+      });
+
+      setListings(sortedData);
       setListingsLoading(false);
     }, (error) => {
       console.error("Listings sync error:", error);
@@ -2227,7 +2405,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
         setSellerApplication(null);
       }
     }, (error) => {
-       console.error("Application sync error:", error);
+       handleFirestoreError(error, 'get', `sellerApplications/${user.id}`);
     });
     return unsubscribe;
   }, [user]);
@@ -2253,7 +2431,31 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .filter(c => !c.archivedBy?.includes(user.id));
       setChats(data);
     }, (error) => {
-      console.error("Chats sync error:", error);
+      handleFirestoreError(error, 'list', 'chats');
+    });
+    return unsubscribe;
+  }, [user]);
+
+  // Sync Transactions
+  useEffect(() => {
+    if (!user) {
+      setTransactions([]);
+      return;
+    }
+    const q = query(
+      collection(db, 'transactions'),
+      where('participants', 'array-contains', user.id),
+      orderBy('createdAt', 'desc')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(d => ({
+        ...d.data(),
+        id: d.id,
+        createdAt: toMillis(d.data().createdAt)
+      } as Transaction));
+      setTransactions(data);
+    }, (error) => {
+      handleFirestoreError(error, 'list', 'transactions');
     });
     return unsubscribe;
   }, [user]);
@@ -2264,6 +2466,57 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
       await signInWithPopup(auth, provider);
     } catch (error) {
       console.error("Login Error:", error);
+    }
+  };
+
+  const createTransaction = async (listing: Listing, paymentMethod: Transaction['paymentMethod']) => {
+    if (!user) return;
+    try {
+      const commissionAmount = listing.price * 0.05;
+      const sellerEarnings = listing.price - commissionAmount;
+
+      const transactionData = {
+        listingId: listing.id,
+        listingTitle: listing.title,
+        listingImage: listing.images[0] || '',
+        buyerId: user.id,
+        buyerName: user.fullName,
+        sellerId: listing.sellerId,
+        sellerName: listing.sellerName,
+        amount: listing.price,
+        commissionAmount,
+        sellerEarnings,
+        status: 'pending',
+        paymentMethod,
+        participants: [user.id, listing.sellerId],
+        createdAt: serverTimestamp()
+      };
+
+      const docRef = await addDoc(collection(db, 'transactions'), transactionData);
+      
+      // Update listing status
+      await updateDoc(doc(db, 'listings', listing.id), {
+        status: 'sold',
+        updatedAt: serverTimestamp()
+      });
+
+      addNotification(`Purchase request for "${listing.title}" sent!`, 'success');
+      return docRef.id;
+    } catch (error) {
+      handleFirestoreError(error, 'create', 'transactions');
+    }
+  };
+
+  const updateTransactionStatus = async (transactionId: string, status: Transaction['status']) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'transactions', transactionId), {
+        status,
+        updatedAt: serverTimestamp()
+      });
+      addNotification(`Transaction status: ${status}`, 'info');
+    } catch (error) {
+      handleFirestoreError(error, 'update', `transactions/${transactionId}`);
     }
   };
 
@@ -2425,13 +2678,40 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const markAsSold = async (listingId: string) => {
     if (!user) return;
     try {
+      // Fetch listing details for transaction record
+      const listing = listings.find(l => l.id === listingId);
+      
       // 1. Update Firebase
       await updateDoc(doc(db, 'listings', listingId), {
         status: 'sold',
         updatedAt: serverTimestamp()
       });
 
-      // 2. Mirror to Supabase
+      // 2. Create Transaction record for history
+      if (listing) {
+        const commissionAmount = listing.price * 0.05;
+        const sellerEarnings = listing.price - commissionAmount;
+
+        const transactionData = {
+          listingId: listing.id,
+          listingTitle: listing.title,
+          listingImage: listing.images[0] || '',
+          buyerId: 'manual_offline',
+          buyerName: 'Manual Sale (Offline)',
+          sellerId: user.id,
+          sellerName: user.fullName,
+          amount: listing.price,
+          commissionAmount,
+          sellerEarnings,
+          status: 'completed',
+          paymentMethod: 'cash_on_meetup',
+          participants: [user.id, 'manual_offline'],
+          createdAt: serverTimestamp()
+        };
+        await addDoc(collection(db, 'transactions'), transactionData);
+      }
+
+      // 3. Mirror to Supabase
       if (supabase) {
         try {
           await supabase
@@ -2626,8 +2906,9 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AppContext.Provider value={{ 
-      user, loading, listings, myListings, favorites, reviews, chats, messages, search, setSearch, listingsLoading,
+      user, loading, listings, myListings, favorites, reviews, chats, messages, transactions, search, setSearch, listingsLoading,
       login, logout, updateProfile, addListing, updateListing, deleteListing, markAsSold, toggleFavorite, createChat, sendMessage, deleteMessage, deleteChat,
+      createTransaction, updateTransactionStatus,
       replyToReview, archiveReview, reportReview,
       sellerApplication, submitSellerApplication,
       notifications, addNotification, removeNotification,
@@ -2908,6 +3189,7 @@ const OnboardingPage = () => {
             onboarded: true
         });
 
+        localStorage.removeItem('campusListingTutorialSeen');
         addNotification("Welcome to CampusMarket! Your profile is ready.", "success");
         navigate('/market');
     };
@@ -3253,6 +3535,204 @@ const NotificationOverlay = () => {
     );
 };
 
+const TransactionsPage = () => {
+    const { transactions, user, updateTransactionStatus } = useApp();
+    const navigate = useNavigate();
+    const [filter, setFilter] = useState<'buying' | 'selling'>('buying');
+
+    const filtered = transactions.filter(t => 
+        filter === 'buying' ? t.buyerId === user?.id : t.sellerId === user?.id
+    );
+
+    if (!user) return null;
+
+    return (
+        <div className="flex-1 px-4 py-8 overflow-y-auto no-scrollbar bg-[#f8fafc]">
+            <div className="max-w-3xl mx-auto space-y-6 pb-20">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-3xl font-black text-text-main">Transaction History</h1>
+                        <p className="text-text-muted text-sm font-medium">Manage your purchases and campus sales</p>
+                    </div>
+                </div>
+
+                <div className="flex gap-2 p-1 bg-white rounded-2xl border border-border-main scroll-hidden">
+                    <button 
+                        onClick={() => setFilter('buying')}
+                        className={cn(
+                            "flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                            filter === 'buying' ? "bg-brand-primary text-white shadow-lg shadow-brand-primary/20" : "text-text-muted hover:text-text-main"
+                        )}
+                    >
+                        Buying
+                    </button>
+                    <button 
+                        onClick={() => setFilter('selling')}
+                        className={cn(
+                            "flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                            filter === 'selling' ? "bg-brand-primary text-white shadow-lg shadow-brand-primary/20" : "text-text-muted hover:text-text-main"
+                        )}
+                    >
+                        Selling
+                    </button>
+                </div>
+
+                <div className="space-y-4">
+                    {filtered.length === 0 ? (
+                        <div className="py-20 text-center space-y-4 bg-white rounded-[40px] border border-border-main border-dashed">
+                            <div className="w-20 h-20 bg-bg-light rounded-[32px] mx-auto flex items-center justify-center text-text-muted/30">
+                                <ShoppingBag size={40} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-black text-text-main uppercase tracking-tight">No {filter} history found</p>
+                                <p className="text-xs text-text-muted font-medium mt-1">Transactions will appear here once you buy or sell items.</p>
+                            </div>
+                        </div>
+                    ) : (
+                        filtered.map(t => (
+                            <div key={t.id} className="bg-white rounded-[32px] p-6 border border-border-main shadow-sm hover:shadow-md transition-all group">
+                                <div className="flex flex-col md:flex-row gap-6">
+                                    <div 
+                                        className="w-24 h-24 rounded-2xl bg-bg-light border border-border-main overflow-hidden flex-shrink-0 cursor-pointer"
+                                        onClick={() => navigate(`/listing/${t.listingId}`)}
+                                    >
+                                        {t.listingImage ? (
+                                            <img src={t.listingImage} alt={t.listingTitle} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-text-muted">
+                                                <ShoppingBag size={32} />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 space-y-2">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <h3 className="font-extrabold text-text-main leading-tight group-hover:text-brand-primary transition-colors cursor-pointer" onClick={() => navigate(`/listing/${t.listingId}`)}>
+                                                    {t.listingTitle}
+                                                </h3>
+                                                <p className="text-[10px] font-black text-brand-primary uppercase tracking-[0.2em] mt-1">₱{t.amount?.toLocaleString()}</p>
+                                            </div>
+                                            <div className={cn(
+                                                "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border",
+                                                t.status === 'completed' ? "bg-green-50 text-green-600 border-green-100" :
+                                                t.status === 'cancelled' ? "bg-red-50 text-red-600 border-red-100" :
+                                                "bg-amber-50 text-amber-600 border-amber-100"
+                                            )}>
+                                                {t.status}
+                                            </div>
+                                        </div>
+
+                                        {filter === 'selling' && (
+                                            <div className="bg-bg-light/50 p-3 rounded-2xl border border-border-main/50 space-y-1">
+                                                <div className="flex justify-between text-[10px] font-bold text-text-muted">
+                                                    <span>Product Price</span>
+                                                    <span>₱{t.amount?.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-[10px] font-bold text-red-500">
+                                                    <span>Platform Fee (5%)</span>
+                                                    <span>-₱{(t.commissionAmount || t.amount * 0.05).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-[10px] font-black text-brand-primary pt-1 border-t border-dashed border-border-main">
+                                                    <span>Your Earnings</span>
+                                                    <span>₱{(t.sellerEarnings || t.amount * 0.95).toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-border-main/50">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-brand-primary/40 animate-pulse"></div>
+                                                <p className="text-[10px] text-text-muted font-bold">
+                                                    {filter === 'buying' ? 'Seller' : 'Buyer'}: <span className="text-text-main">{filter === 'buying' ? t.sellerName : t.buyerName}</span>
+                                                </p>
+                                            </div>
+                                            <p className="text-[10px] text-text-muted font-bold">
+                                                Method: <span className="text-text-main uppercase">{t.paymentMethod?.replace(/_/g, ' ')}</span>
+                                            </p>
+                                            <p className="text-[10px] text-text-muted font-bold">
+                                                Date: <span className="text-text-main">{new Date(t.createdAt).toLocaleDateString()}</span>
+                                            </p>
+                                        </div>
+
+                                        {filter === 'selling' && t.status === 'pending' && (
+                                            <div className="flex gap-2 pt-4">
+                                                <button 
+                                                    onClick={() => updateTransactionStatus(t.id, 'completed')}
+                                                    className="flex-1 py-3 bg-brand-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+                                                >
+                                                    Confirm Completion
+                                                </button>
+                                                <button 
+                                                    onClick={() => updateTransactionStatus(t.id, 'cancelled')}
+                                                    className="px-6 py-3 border border-red-100 text-red-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 transition-all"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const TutorialManager = () => {
+  const { user } = useApp();
+  const location = useLocation();
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  useEffect(() => {
+    const hasSeenTutorial = localStorage.getItem('campusListingTutorialSeen');
+    // Only show tutorial on market page if user is logged in AND on desktop
+    if (!hasSeenTutorial && user && location.pathname === '/market' && window.innerWidth >= 1024) {
+      const timer = setTimeout(() => setShowTutorial(true), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [user, location.pathname]);
+
+  const tutorialSteps = [
+    {
+      targetId: "market-grid",
+      title: "The Marketplace",
+      content: "Browse all active listings from fellow students. You can filter by category or price using the tabs above.",
+    },
+    {
+      targetId: window.innerWidth < 1024 ? (window.innerWidth < 768 ? "sell-tab" : "market-grid") : "seller-hub-widget",
+      title: "Start Selling",
+      content: "Ready to declutter? Complete your verification to start posting your own items.",
+    },
+    {
+      targetId: window.innerWidth < 1024 ? (window.innerWidth < 768 ? "mobile-tabs" : "sidebar-nav") : "sidebar-nav",
+      title: "Easy Navigation",
+      content: "Quickly jump between categories, your favorites, and your profile using the side menu.",
+    },
+    {
+      targetId: "navbar",
+      title: "Quick Access",
+      content: "Use the search bar to find specific items or check your notifications and messages here.",
+    }
+  ];
+
+  const handleTutorialComplete = () => {
+    localStorage.setItem('campusListingTutorialSeen', 'true');
+    setShowTutorial(false);
+  };
+
+  return (
+    <SpotlightTutorial 
+      isActive={showTutorial}
+      steps={tutorialSteps}
+      onComplete={handleTutorialComplete}
+      onSkip={handleTutorialComplete}
+    />
+  );
+};
+
 const AppContent = () => {
   const { loading, user } = useApp();
 
@@ -3277,6 +3757,7 @@ const AppContent = () => {
         >
           <Router>
             <NotificationOverlay />
+            <TutorialManager />
             <AnimatePresence mode="wait">
               <Routes>
                 <Route path="/" element={<LandingPage />} />
@@ -3302,6 +3783,7 @@ const AppContent = () => {
                             <Route path="/sell" element={<SellPage />} />
                             <Route path="/profile" element={<ProfilePage />} />
                             <Route path="/profile/:id" element={<PublicProfilePage />} />
+                            <Route path="/purchases" element={<TransactionsPage />} />
                             <Route path="/verify" element={<VerificationPage />} />
                             <Route path="/listing/:id" element={<ListingDetail />} />
                             <Route path="/chat/:id" element={<ChatPage />} />

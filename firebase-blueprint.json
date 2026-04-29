@@ -40,6 +40,7 @@
         "contactMethod": { "type": "string" },
         "views": { "type": "number" },
         "inquiries": { "type": "number" },
+        "isFeatured": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -101,6 +102,27 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "fullName", "school", "status", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction Record",
+      "description": "A record of a completed or pending purchase",
+      "type": "object",
+      "properties": {
+        "listingId": { "type": "string" },
+        "listingTitle": { "type": "string" },
+        "listingImage": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "buyerName": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "amount": { "type": "number" },
+        "commissionAmount": { "type": "number" },
+        "sellerEarnings": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] },
+        "paymentMethod": { "type": "string", "enum": ["cash_on_meetup", "bank_transfer", "other"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["listingId", "listingTitle", "buyerId", "sellerId", "amount", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -138,6 +160,10 @@
         }
       },
       "description": "Individual chat messages"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Purchase and sales records"
     }
   }
 }

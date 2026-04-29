@@ -103,6 +103,15 @@ service cloud.firestore {
              data.createdAt is timestamp;
     }
 
+    function isValidTransaction(data) {
+      return (resource != null || data.keys().hasAll(['listingId', 'listingTitle', 'buyerId', 'buyerName', 'sellerId', 'sellerName', 'amount', 'status', 'paymentMethod', 'participants', 'createdAt'])) &&
+             (!('buyerId' in data) || (data.buyerId == (resource == null ? request.auth.uid : existing().buyerId) || (data.buyerId == 'manual_offline' && data.sellerId == request.auth.uid))) &&
+             (!('participants' in data) || (data.participants is list && data.participants.size() == 2 && data.buyerId in data.participants && data.sellerId in data.participants)) &&
+             (!('status' in data) || data.status in ['pending', 'completed', 'cancelled']) &&
+             (!('amount' in data) || data.amount is number && data.amount > 0) &&
+             (!('createdAt' in data) || data.createdAt == (resource == null ? request.time : existing().createdAt));
+    }
+
     // --- 3. Collection Rules ---
 
     match /users/{userId} {
@@ -175,6 +184,19 @@ service cloud.firestore {
                       request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
         allow delete: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
       }
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow create: if isSignedIn() && isValidTransaction(incoming());
+      allow update: if isSignedIn() && 
+                    request.auth.uid in existing().participants &&
+                    isValidTransaction(incoming()) && (
+                      // Only seller can confirm completion
+                      (request.auth.uid == existing().sellerId && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+                      // Either can cancel a pending one
+                      (existing().status == 'pending' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) && incoming().status == 'cancelled')
+                    );
     }
   }
 }

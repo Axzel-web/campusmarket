@@ -38,6 +38,7 @@ export interface Listing {
   contactMethod: string;
   views: number;
   inquiries: number;
+  isFeatured?: boolean;
   createdAt: any; // Timestamp or number
   updatedAt?: any;
 }
@@ -87,5 +88,22 @@ export interface SellerApplication {
   contactLink: string;
   photoURL: string;
   status: 'pending' | 'approved' | 'rejected';
+  createdAt: any;
+}
+
+export interface Transaction {
+  id: string;
+  listingId: string;
+  listingTitle: string;
+  listingImage?: string;
+  buyerId: string;
+  buyerName: string;
+  sellerId: string;
+  sellerName: string;
+  amount: number;
+  commissionAmount: number;
+  sellerEarnings: number;
+  status: 'pending' | 'completed' | 'cancelled';
+  paymentMethod: 'cash_on_meetup' | 'bank_transfer' | 'other';
   createdAt: any;
 }

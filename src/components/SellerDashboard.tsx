@@ -52,6 +52,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [ratingFilter, setRatingFilter] = useState<number | 'all'>('all');
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'rating-high' | 'rating-low'>('newest');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
@@ -68,8 +69,12 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
     const avgRating = totalReviews > 0 ? approved.reduce((sum, r) => sum + r.rating, 0) / totalReviews : 0;
     
     const activeProducts = myListings.filter(l => l.status === 'active').length;
-    const itemsSold = myListings.filter(l => l.status === 'sold').length;
-    const totalRevenue = myListings.filter(l => l.status === 'sold').reduce((sum, l) => sum + l.price, 0);
+    const soldListings = myListings.filter(l => l.status === 'sold');
+    const itemsSold = soldListings.length;
+    const totalRevenue = soldListings.reduce((sum, l) => sum + l.price, 0);
+    const totalCommission = totalRevenue * 0.05;
+    const netEarnings = totalRevenue - totalCommission;
+    
     const totalViews = myListings.reduce((sum, l) => sum + (l.views || 0), 0);
     const totalInquiries = myListings.reduce((sum, l) => sum + (l.inquiries || 0), 0);
     
@@ -80,12 +85,12 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
       return date >= startOfToday;
     }).length;
 
-    return { totalReviews, avgRating, activeProducts, itemsSold, totalRevenue, totalViews, totalInquiries, newToday };
+    return { totalReviews, avgRating, activeProducts, itemsSold, totalRevenue, totalCommission, netEarnings, totalViews, totalInquiries, newToday };
   }, [reviews, myListings]);
 
   // Filtering logic
   const filteredReviews = useMemo(() => {
-    return reviews.filter(r => {
+    let result = reviews.filter(r => {
       if (r.status !== 'approved') return false;
       
       const matchesSearch = r.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -110,12 +115,27 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
       }
 
       return matchesSearch && matchesRating && matchesDate;
-    }).sort((a, b) => {
-       const dateA = a.approvedAt ? (a.approvedAt.toMillis ? a.approvedAt.toMillis() : a.approvedAt) : 0;
-       const dateB = b.approvedAt ? (b.approvedAt.toMillis ? b.approvedAt.toMillis() : b.approvedAt) : 0;
-       return Number(dateB) - Number(dateA);
     });
-  }, [reviews, searchTerm, ratingFilter, dateFilter]);
+
+    // Sorting logic
+    return result.sort((a, b) => {
+      const dateA = a.approvedAt ? Number(a.approvedAt.toMillis ? a.approvedAt.toMillis() : a.approvedAt) : 0;
+      const dateB = b.approvedAt ? Number(b.approvedAt.toMillis ? b.approvedAt.toMillis() : b.approvedAt) : 0;
+
+      switch (sortBy) {
+        case 'newest':
+          return dateB - dateA;
+        case 'oldest':
+          return dateA - dateB;
+        case 'rating-high':
+          return b.rating - a.rating || dateB - dateA;
+        case 'rating-low':
+          return a.rating - b.rating || dateB - dateA;
+        default:
+          return dateB - dateA;
+      }
+    });
+  }, [reviews, searchTerm, ratingFilter, dateFilter, sortBy]);
 
   const handleReplySubmit = (id: string) => {
     if (!replyText.trim()) return;
@@ -125,7 +145,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
   };
 
   return (
-    <div className="flex-1 bg-bg-light min-h-[calc(100vh-64px)] pb-10">
+    <div className="flex-1 bg-bg-light min-h-[calc(100vh-64px)] pb-10 overflow-y-auto">
       {/* Header */}
       <div className="bg-white border-b border-border-main sticky top-0 z-30 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -165,13 +185,16 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
 
       <div className="max-w-6xl mx-auto px-6 pt-8 space-y-8">
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[
             { label: 'Total Items Sold', value: stats.itemsSold, icon: Package, color: 'text-brand-primary', bg: 'bg-accent-subtle' },
-            { label: 'Total Revenue', value: `₱${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-brand-primary', bg: 'bg-accent-subtle' },
+            { label: 'Total Sales (Gross)', value: `₱${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-brand-primary', bg: 'bg-accent-subtle' },
+            { label: 'Total Platform Fees', value: `₱${stats.totalCommission.toLocaleString()}`, icon: Flag, color: 'text-red-500', bg: 'bg-red-50' },
+            { label: 'Net Earnings', value: `₱${stats.netEarnings.toLocaleString()}`, icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-50' },
             { label: 'Average Rating', value: stats.avgRating.toFixed(1), icon: Star, color: 'text-amber-500', bg: 'bg-amber-50' },
             { label: 'Active Products', value: stats.activeProducts, icon: ShoppingBag, color: 'text-blue-500', bg: 'bg-blue-50' },
             { label: 'Total Item Views', value: stats.totalViews, icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50' },
+            { label: 'Total Inquiries', value: stats.totalInquiries, icon: MessageCircle, color: 'text-brand-primary', bg: 'bg-accent-subtle' },
           ].map((stat, i) => (
             <motion.div 
               key={i}
@@ -333,10 +356,24 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
                       onChange={(e) => setDateFilter(e.target.value as any)}
                       className="h-12 pl-10 pr-10 bg-bg-light border border-border-main rounded-2xl text-sm font-bold text-text-main appearance-none cursor-pointer focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary outline-none"
                     >
-                      <option value="all">Date: All Time</option>
-                      <option value="today">Today</option>
-                      <option value="week">This Week</option>
-                      <option value="month">This Month</option>
+                      <option value="all">Period: All Time</option>
+                      <option value="today">Today Only</option>
+                      <option value="week">Last 7 Days</option>
+                      <option value="month">Last 30 Days</option>
+                    </select>
+                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" size={16} />
+                  </div>
+                  <div className="relative group">
+                    <TrendingUp className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
+                    <select 
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as any)}
+                      className="h-12 pl-10 pr-10 bg-bg-light border border-border-main rounded-2xl text-sm font-bold text-text-main appearance-none cursor-pointer focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary outline-none"
+                    >
+                      <option value="newest">Sort: Newest</option>
+                      <option value="oldest">Sort: Oldest</option>
+                      <option value="rating-high">Rating: High to Low</option>
+                      <option value="rating-low">Rating: Low to High</option>
                     </select>
                     <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" size={16} />
                   </div>
