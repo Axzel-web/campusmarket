@@ -39,7 +39,7 @@ import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication, Tra
 import { cn, compressImage } from './lib/utils';
 import { generateListingDetails } from './services/geminiService';
 import { uploadAvatar, uploadStudentId, syncUserProfileToSupabase } from './services/userService';
-import { LandingPage } from './components/LandingPage';
+import LandingPage from './components/LandingPage';
 import { SellerDashboard } from './components/SellerDashboard';
 import { LoadingAnimation } from './components/LoadingAnimation';
 import { AboutPage } from './components/AboutPage';
@@ -886,7 +886,7 @@ const LoginPage = () => {
   };
 
   const themeBackground = "#f3f4f6";
-  const themePrimaryColor = "#00D285";
+  const themePrimaryColor = "#EF895F";
   const themeColor = "#000000";
   const isDarkTheme = false;
 

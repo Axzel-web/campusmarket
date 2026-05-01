@@ -1,323 +1,23 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useApp } from '../App';
-import * as THREE from 'three';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
-import { AfterimagePass } from 'three/examples/jsm/postprocessing/AfterimagePass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Menu, X } from 'lucide-react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { motion } from 'motion/react';
-import { MarketplacePreview } from './MarketplacePreview';
-import { Footer } from './Footer';
+// LandingPage.tsx — CampusMarket cinematic scroll landing.
+// A fixed full-screen 3D canvas (three.js WebGPU portal scene) sits behind
+// scrolling sections. GSAP ScrollTrigger feeds a 0..1 progress ref into the
+// scene to drive a cinematic camera path.
+import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { useApp } from "../App";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Scene3D from "./Scene3D";
 
-/**
- * LandingPage component: A faithful reconstruction of the original airplane guide landing page.
- * Integrated with the marketplace app flow.
- */
-/**
- * HomeBackground component: Fractal Glass Distortion Background
- * Based on user-provided Three.js code.
- */
-const HomeBackground = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+gsap.registerPlugin(ScrollTrigger);
 
-  useEffect(() => {
-    if (!canvasRef.current || !containerRef.current) return;
-
-    const isMobile = window.innerWidth < 768;
-    const renderer = new THREE.WebGLRenderer({
-      canvas: canvasRef.current,
-      antialias: !isMobile,
-      alpha: true,
-      powerPreference: "high-performance"
-    });
-
-    renderer.setClearColor(0x000000, 0); 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
-    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      45,
-      containerRef.current.clientWidth / containerRef.current.clientHeight,
-      0.1,
-      1000
-    );
-    camera.position.set(0, 0, window.innerWidth < 768 ? 15 : 10);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.enabled = true;
-    controls.dampingFactor = 0.05;
-    controls.enablePan = false;
-    controls.enableZoom = false;
-
-    const angleLimit = Math.PI / 7;
-    controls.minPolarAngle = Math.PI / 2 - angleLimit;
-    controls.maxPolarAngle = Math.PI / 2 + angleLimit;
-
-    // Add a gradient HDR background
-    const hdrEquirect = new RGBELoader()
-      .setPath("https://miroleon.github.io/daily-assets/")
-      .load("GRADIENT_01_01_comp.hdr", 
-        function (texture) {
-          texture.mapping = THREE.EquirectangularReflectionMapping;
-          scene.environment = texture;
-        },
-        undefined,
-        (err) => console.warn("Failed to load HDR background:", err)
-      );
-
-    scene.fog = new THREE.FogExp2(0x11151c, 0.4);
-
-    const surfaceImperfection = new THREE.TextureLoader().load(
-      "https://miroleon.github.io/daily-assets/surf_imp_02.jpg",
-      undefined,
-      undefined,
-      (err) => console.warn("Failed to load surface imperfection texture:", err)
-    );
-    surfaceImperfection.wrapT = THREE.RepeatWrapping;
-    surfaceImperfection.wrapS = THREE.RepeatWrapping;
-
-    const mint_mat = new THREE.MeshPhysicalMaterial({
-      color: 0x3FFFB2,
-      emissive: 0x3FFFB2,
-      emissiveIntensity: 1.5,
-      roughness: 0.1,
-      metalness: 0.2,
-      roughnessMap: surfaceImperfection,
-      envMap: hdrEquirect,
-      envMapIntensity: 2
-    });
-
-    const black_mat = new THREE.MeshPhysicalMaterial({
-      color: 0x010101,
-      roughness: 0.1,
-      metalness: 0.8,
-      roughnessMap: surfaceImperfection,
-      envMap: hdrEquirect,
-      envMapIntensity: 1.5
-    });
-
-    const fbxloader = new FBXLoader();
-    fbxloader.load(
-      "https://miroleon.github.io/daily-assets/two_hands_01.fbx",
-      function (object) {
-        let meshCount = 0;
-        object.traverse(function (child) {
-          if ((child as THREE.Mesh).isMesh) {
-            (child as THREE.Mesh).material = (meshCount % 2 === 0) ? black_mat : mint_mat;
-            meshCount++;
-          }
-        });
-        object.position.set(0, 0, 0);
-        const scalar = window.innerWidth < 768 ? 0.035 : 0.05;
-        object.scale.setScalar(scalar);
-        scene.add(object);
-      },
-      undefined,
-      (err) => console.warn("Failed to load hand model:", err)
-    );
-
-    // POST PROCESSING
-    const renderScene = new RenderPass(scene, camera);
-    const afterimagePass = new AfterimagePass();
-    afterimagePass.uniforms["damp"].value = 0.9;
-
-    const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(containerRef.current.clientWidth, containerRef.current.clientHeight),
-      1.75,
-      0.1,
-      1
-    );
-
-    const displacementShader = {
-      uniforms: {
-        tDiffuse: { value: null },
-        displacement: { value: null },
-        scale: { value: 0.025 },
-        tileFactor: { value: 2 }
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D tDiffuse;
-        uniform sampler2D displacement;
-        uniform float scale;
-        uniform float tileFactor;
-        varying vec2 vUv;
-        void main() {
-            if (vUv.x < 0.75 && vUv.x > 0.25 && vUv.y < 0.75 && vUv.y > 0.25) {
-                vec2 tiledUv = mod(vUv * tileFactor, 1.0);
-                vec2 disp = texture2D(displacement, tiledUv).rg * scale;
-                vec2 distUv = vUv + disp;
-                gl_FragColor = texture2D(tDiffuse, distUv);
-            } else {
-                gl_FragColor = texture2D(tDiffuse, vUv);
-            }
-        }
-      `
-    };
-
-    const displacementTexture = new THREE.TextureLoader().load(
-      "https://raw.githubusercontent.com/miroleon/displacement_texture_freebie/main/assets/1K/jpeg/normal/ml-dpt-21-1K_normal.jpeg",
-      function (texture) {
-        texture.minFilter = THREE.NearestFilter;
-      },
-      undefined,
-      (err) => console.warn("Failed to load displacement texture:", err)
-    );
-
-    const displacementPass = new ShaderPass(displacementShader);
-    displacementPass.uniforms["displacement"].value = displacementTexture;
-
-    const composer = new EffectComposer(renderer);
-    composer.addPass(renderScene);
-    
-    // Disable heavy effects on mobile for performance
-    if (!isMobile) {
-      composer.addPass(afterimagePass);
-      composer.addPass(bloomPass);
-      composer.addPass(displacementPass);
-    }
-
-    function easeInOutCubic(x: number) {
-      return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-    }
-
-    let isUserInteracting = false;
-    let transitionProgress = 0;
-    const transitionTime = 2; 
-    const transitionIncrement = 1 / (60 * transitionTime);
-    const transitionStartCameraPosition = new THREE.Vector3();
-    const transitionStartCameraQuaternion = new THREE.Quaternion();
-
-    let theta = 0;
-    const updateCamera = function () {
-      theta += 0.005;
-
-      const targetPosition = new THREE.Vector3(
-        Math.sin(theta) * 3,
-        Math.sin(theta),
-        Math.cos(theta) * 3
-      );
-
-      const targetQuaternion = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0, -theta, 0)
-      );
-
-      if (isUserInteracting) {
-        if (transitionProgress > 0) {
-          transitionProgress = 0;
-        }
-        transitionStartCameraPosition.copy(camera.position);
-        transitionStartCameraQuaternion.copy(camera.quaternion);
-      } else {
-        if (transitionProgress < 1) {
-          transitionProgress += transitionIncrement;
-          const easedProgress = easeInOutCubic(transitionProgress);
-          camera.position.lerpVectors(
-            transitionStartCameraPosition,
-            targetPosition,
-            easedProgress
-          );
-          camera.quaternion.slerpQuaternions(
-            transitionStartCameraQuaternion,
-            targetQuaternion,
-            easedProgress
-          );
-        } else {
-          camera.position.copy(targetPosition);
-          camera.quaternion.copy(targetQuaternion);
-        }
-      }
-      camera.lookAt(scene.position);
-    };
-
-    const onControlsStart = () => { isUserInteracting = true; };
-    const onControlsEnd = () => {
-      isUserInteracting = false;
-      transitionStartCameraPosition.copy(camera.position);
-      transitionStartCameraQuaternion.copy(camera.quaternion);
-      transitionProgress = 0;
-    };
-
-    controls.addEventListener("start", onControlsStart);
-    controls.addEventListener("end", onControlsEnd);
-
-    const onResize = () => {
-      if (!containerRef.current) return;
-      const width = containerRef.current.clientWidth;
-      const height = containerRef.current.clientHeight;
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
-      composer.setSize(width, height);
-    };
-
-    window.addEventListener("resize", onResize);
-
-    let animationId: number;
-    let frameCount = 0;
-    const animate = () => {
-      animationId = requestAnimationFrame(animate);
-      
-      // Throttle Rendering on Mobile 
-      if (isMobile) {
-        frameCount++;
-        if (frameCount % 2 !== 0) return; 
-      }
-
-      controls.update();
-      updateCamera();
-      if (!isMobile) {
-        composer.render();
-      } else {
-        renderer.render(scene, camera);
-      }
-    };
-
-    animate();
-
-    return () => {
-      window.removeEventListener("resize", onResize);
-      cancelAnimationFrame(animationId);
-      controls.removeEventListener("start", onControlsStart);
-      controls.removeEventListener("end", onControlsEnd);
-      renderer.dispose();
-      scene.clear();
-      composer.dispose();
-    };
-  }, []);
-
-  return (
-    <div ref={containerRef} className="absolute inset-0 z-0">
-      <canvas ref={canvasRef} className="w-full h-full block" />
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#D0CBC7]/20 pointer-events-none" />
-    </div>
-  );
-};
-
-export const LandingPage: React.FC = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
+export default function LandingPage() {
   const { user, loading } = useApp();
   const navigate = useNavigate();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const progressRef = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  // Redirect if user is already logged in
   useEffect(() => {
     if (!loading && user) {
       navigate('/market');
@@ -325,1012 +25,201 @@ export const LandingPage: React.FC = () => {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    gsap.registerPlugin(ScrollTrigger);
-
-    // --- Scene Setup ---
-    class Scene {
-      views: any[];
-      renderer: THREE.WebGLRenderer;
-      scene: THREE.Scene;
-      modelGroup: THREE.Group;
-      light: THREE.PointLight;
-      softLight: THREE.AmbientLight;
-      w: number = window.innerWidth;
-      h: number = window.innerHeight;
-
-      constructor(model: THREE.Object3D) {
-        this.views = [
-          { bottom: 0, height: 1 },
-          { bottom: 0, height: 0 }
-        ];
-
-        const isMobile = window.innerWidth < 768;
-        this.renderer = new THREE.WebGLRenderer({
-          antialias: !isMobile,
-          alpha: true,
-          powerPreference: "high-performance"
-        });
-
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.shadowMap.enabled = !isMobile;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
-
-        // Apply visual properties directly as in CSS
-        this.renderer.domElement.style.position = 'fixed';
-        this.renderer.domElement.style.top = '0';
-        this.renderer.domElement.style.left = '0';
-        this.renderer.domElement.style.zIndex = '2';
-        this.renderer.domElement.style.pointerEvents = 'none';
-        this.renderer.domElement.style.visibility = 'hidden';
-        this.renderer.domElement.style.opacity = '0';
-        this.renderer.domElement.className = 'three-canvas';
-
-        if (containerRef.current) {
-          containerRef.current.appendChild(this.renderer.domElement);
-        }
-
-        this.scene = new THREE.Scene();
-
-        for (let ii = 0; ii < this.views.length; ++ii) {
-          const view = this.views[ii];
-          const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2000);
-          camera.position.fromArray([0, 0, 180]);
-          camera.layers.disableAll();
-          camera.layers.enable(ii);
-          view.camera = camera;
-          camera.lookAt(new THREE.Vector3(0, 5, 0));
-        }
-
-        // Adjust light intensity for Three.js 0.180+ (normalized)
-        this.light = new THREE.PointLight(0xffffff, 15); 
-        this.light.position.set(70, -20, 150);
-        this.scene.add(this.light);
-
-        this.softLight = new THREE.AmbientLight(0xffffff, 1.5);
-        this.scene.add(this.softLight);
-
-        this.onResize();
-        window.addEventListener('resize', this.onResize, false);
-
-        // Robust mesh discovery
-        let mesh: THREE.Mesh | null = null;
-        model.traverse(child => {
-          if (!mesh && child instanceof THREE.Mesh) mesh = child;
-        });
-
-        if (mesh) {
-          const edges = new THREE.EdgesGeometry(mesh.geometry);
-          const line = new THREE.LineSegments(edges);
-          line.material = new THREE.LineBasicMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.1, // Much more subtle
-            depthTest: false
-          });
-          line.position.set(0.5, 0.2, -1);
-          
-          this.modelGroup = new THREE.Group();
-          model.layers.set(0);
-          line.layers.set(1);
-
-          this.modelGroup.add(model);
-          this.modelGroup.add(line);
-          this.scene.add(this.modelGroup);
-        } else {
-          this.modelGroup = new THREE.Group();
-          this.modelGroup.add(model);
-          this.scene.add(this.modelGroup);
-        }
-      }
-
-      render = () => {
-        for (let ii = 0; ii < this.views.length; ++ii) {
-          const view = this.views[ii];
-          const camera = view.camera;
-
-          const bottom = Math.floor(this.h * view.bottom);
-          const height = Math.floor(this.h * view.height);
-
-          this.renderer.setViewport(0, 0, this.w, this.h);
-          this.renderer.setScissor(0, bottom, this.w, height);
-          this.renderer.setScissorTest(true);
-
-          camera.aspect = this.w / this.h;
-          camera.updateProjectionMatrix();
-          this.renderer.render(this.scene, camera);
-        }
-      }
-
-      onResize = () => {
-        this.w = window.innerWidth;
-        this.h = window.innerHeight;
-
-        for (let ii = 0; ii < this.views.length; ++ii) {
-          const view = this.views[ii];
-          const camera = view.camera;
-          camera.aspect = this.w / this.h;
-          
-          // Better mobile scaling: pull camera back further on narrow screens
-          let camZ = 180;
-          if (this.w < 800) {
-            camZ = 180 + (800 - this.w) * 0.5;
-          }
-          camera.position.z = Math.max(180, camZ);
-          camera.updateProjectionMatrix();
-        }
-
-        this.renderer.setSize(this.w, this.h);
-        this.render();
-      }
-
-      destroy = () => {
-        window.removeEventListener('resize', this.onResize);
-        if (this.renderer.domElement.parentNode) {
-          this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
-        }
-        this.renderer.dispose();
-      }
-    }
-
-    let activeScene: Scene | null = null;
-
-    const setupAnimation = (model: THREE.Object3D) => {
-      activeScene = new Scene(model);
-      const plane = activeScene.modelGroup;
-
-      const tau = Math.PI * 2;
-
-      // Airplane Visibility Control (Hidden on Home)
-      gsap.set(activeScene.renderer.domElement, { autoAlpha: 0, x: "50%" });
+    const ctx = gsap.context(() => {
       ScrollTrigger.create({
-        trigger: ".landing-content",
-        start: "top 80%",
-        onEnter: () => {
-          if (activeScene) {
-            gsap.to(activeScene.renderer.domElement, { autoAlpha: 1, x: "0%", duration: 1 });
-            gsap.to('.scroll-cta', { opacity: 1, duration: 1 });
-          }
+        trigger: containerRef.current,
+        start: "top top",
+        end: "bottom bottom",
+        scrub: 1.2,
+        onUpdate: (self) => {
+          progressRef.current = self.progress;
         },
-        onLeaveBack: () => {
-          if (activeScene) {
-            gsap.to(activeScene.renderer.domElement, { autoAlpha: 0, x: "50%", duration: 0.5 });
-            gsap.to('.scroll-cta', { opacity: 0, duration: 0.5 });
-          }
-        }
       });
 
-      // Airplane animations setup
-      const initialX = window.innerWidth < 800 ? 0 : 80;
-      gsap.set(plane.rotation, { y: tau * -.25 });
-      gsap.set(plane.position, { x: initialX, y: -32, z: -60 });
-
-      activeScene.render();
-
-      const sectionDuration = 1;
-
-      // Split view animations
-      gsap.fromTo(activeScene.views[1],
-        { height: 1, bottom: 0 },
-        {
-          height: 0, bottom: 1,
-          ease: 'none',
-          scrollTrigger: {
-            trigger: ".blueprint",
-            scrub: true,
-            start: "bottom bottom",
-            end: "bottom top",
-            onUpdate: activeScene.render
-          }
-        });
-
-      gsap.fromTo(activeScene.views[1],
-        { height: 0, bottom: 0 },
-        {
-          height: 1, bottom: 0,
-          ease: 'none',
-          scrollTrigger: {
-            trigger: ".blueprint",
-            scrub: true,
-            start: "top bottom",
-            end: "top top",
-            onUpdate: activeScene.render
-          }
-        });
-
-      // Parallax
-      gsap.to('.ground', {
-        y: "30%",
-        scrollTrigger: {
-          trigger: ".ground-container",
-          scrub: true,
-          start: "top bottom",
-          end: "bottom top"
-        }
+      gsap.utils.toArray<HTMLElement>("[data-fade]").forEach((el) => {
+        gsap.fromTo(
+          el,
+          { opacity: 0, y: 60 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 1.2,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: el,
+              start: "top 80%",
+              end: "top 40%",
+              scrub: 1,
+            },
+          },
+        );
       });
 
-      gsap.from('.clouds', {
-        y: "25%",
+      gsap.to(".hero-glow-layer", {
+        opacity: 0.2,
         scrollTrigger: {
-          trigger: ".ground-container",
+          trigger: containerRef.current,
+          start: "80% bottom",
+          end: "bottom bottom",
           scrub: true,
-          start: "top bottom",
-          end: "bottom top"
-        }
-      });
-
-      // Core Timeline
-      const tl = gsap.timeline({
-        onUpdate: activeScene.render,
-        scrollTrigger: {
-          trigger: ".landing-content",
-          scrub: true,
-          start: "top top",
-          end: "bottom bottom"
         },
-        defaults: { duration: sectionDuration, ease: 'power2.inOut' }
       });
+    }, containerRef);
 
-      let delay = 0;
-      tl.to('.scroll-cta', { duration: 0.25, opacity: 0 }, delay);
-      tl.to(plane.position, { x: -10, ease: 'power1.in' }, delay);
-
-      delay += sectionDuration;
-      tl.to(plane.rotation, { x: tau * .25, y: 0, z: -tau * 0.05, ease: 'power1.inOut' }, delay);
-      tl.to(plane.position, { x: -40, y: 0, z: -60, ease: 'power1.inOut' }, delay);
-
-      delay += sectionDuration;
-      tl.to(plane.rotation, { x: tau * .25, y: 0, z: tau * 0.05, ease: 'power3.inOut' }, delay);
-      tl.to(plane.position, { x: 40, y: 0, z: -60, ease: 'power2.inOut' }, delay);
-
-      delay += sectionDuration;
-      tl.to(plane.rotation, { x: tau * .2, y: 0, z: -tau * 0.1, ease: 'power3.inOut' }, delay);
-      tl.to(plane.position, { x: -40, y: 0, z: -30, ease: 'power2.inOut' }, delay);
-
-      delay += sectionDuration;
-      tl.to(plane.rotation, { x: 0, z: 0, y: tau * .25 }, delay);
-      tl.to(plane.position, { x: 0, y: -10, z: 50 }, delay);
-
-      delay += sectionDuration * 2;
-      tl.to(plane.rotation, { x: tau * 0.25, y: tau * .5, z: 0, ease: 'power4.inOut' }, delay);
-      tl.to(plane.position, { z: 30, ease: 'power4.inOut' }, delay);
-
-      delay += sectionDuration;
-      tl.to(plane.rotation, { x: tau * 0.25, y: tau * .5, z: 0, ease: 'power4.inOut' }, delay);
-      tl.to(plane.position, { z: 60, x: 30, ease: 'power4.inOut' }, delay);
-
-      delay += sectionDuration;
-      tl.to(plane.rotation, { x: tau * 0.35, y: tau * .75, z: tau * 0.6, ease: 'power4.inOut' }, delay);
-      tl.to(plane.position, { z: 100, x: 20, y: 0, ease: 'power4.inOut' }, delay);
-
-      delay += sectionDuration;
-      tl.to(plane.rotation, { x: tau * 0.15, y: tau * .85, z: -tau * 0, ease: 'power1.in' }, delay);
-      tl.to(plane.position, { z: -150, x: 0, y: 0, ease: 'power1.inOut' }, delay);
-
-      delay += sectionDuration;
-      tl.to(plane.rotation, { duration: sectionDuration, x: -tau * 0.05, y: tau, z: -tau * 0.1, ease: 'none' }, delay);
-      tl.to(plane.position, { duration: sectionDuration, x: 0, y: 30, z: 320, ease: 'power1.in' }, delay);
-
-      tl.to(activeScene.light.position, { duration: sectionDuration, x: 0, y: 0, z: 0 }, delay);
-    };
-
-    const loadModel = () => {
-      const loader = new OBJLoader();
-      
-      loader.load(
-        'https://assets.codepen.io/557388/1405+Plane_1.obj', 
-        (object) => {
-          object.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-              child.material = new THREE.MeshPhongMaterial({
-                color: 0x171511,
-                specular: 0xD0CBC7,
-                shininess: 5,
-                flatShading: true
-              });
-            }
-          });
-          setupAnimation(object);
-        },
-        undefined,
-        (error) => {
-          console.error(error);
-        }
-      );
-    };
-
-    loadModel();
-
-    return () => {
-      if (activeScene) activeScene.destroy();
-      ScrollTrigger.getAll().forEach(t => t.kill());
-    };
+    return () => ctx.revert();
   }, []);
 
+  if (loading || user) return null;
+
   return (
-    <div className="landing-page-wrapper selection:bg-black selection:text-white">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        
-        html {
-          scroll-behavior: smooth;
-        }
-
-        .landing-page-wrapper {
-          --padding: 10vmin;
-          --color-background: #D0CBC7;
-          --color-text: black;
-          --color-text-light: white;
-          --font-size-large: 8vw;
-          --font-size-medium: 4vw;
-          --font-size-normal: 2vw;
-          margin: 0;
-          min-height: 100vh;
-          min-width: 100vw;
-          font-family: 'Libre Baskerville', serif;
-          background-color: var(--color-background);
-          font-weight: 400;
-          font-size: var(--font-size-normal);
-          overflow-x: hidden;
-          color: var(--color-text);
-          position: relative;
-          line-height: 1.5;
-        }
-
-        @media only screen and (min-width: 800px) {
-          .landing-page-wrapper {
-            --font-size-large: 64px;
-            --font-size-medium: 32px;
-            --font-size-normal: 16px;
-          }
-        }
-
-        @media only screen and (max-width: 500px) {
-          .landing-page-wrapper {
-            --font-size-large: 40px;
-            --font-size-medium: 20px;
-            --font-size-normal: 14px;
-          }
-        }
-
-        .landing-page-wrapper a { color: black; font-weight: 700; }
-        .landing-page-wrapper ul { margin: 0; padding: 0; list-style: none; }
-        .landing-page-wrapper li { margin-top: 10px; }
-
-        /* Navigation */
-        .landing-nav {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          background: rgba(208, 203, 199, 0.95);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          z-index: 2000;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 0.8rem 1.5rem;
-          border-bottom: 1px solid rgba(0,0,0,0.08);
-          transition: all 0.3s ease;
-        }
-
-        @media only screen and (min-width: 800px) {
-           .landing-nav {
-             padding: 0.8rem var(--padding);
-           }
-        }
-
-        .nav-links {
-          display: none;
-          flex-direction: row;
-          gap: 2rem;
-          align-items: center;
-        }
-
-        @media only screen and (min-width: 769px) {
-           .nav-links {
-             display: flex;
-           }
-        }
-
-        .nav-links a {
-          white-space: nowrap;
-          text-decoration: none;
-          color: black;
-          font-size: 11px;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 0.15em;
-          opacity: 0.5;
-          transition: all 0.3s;
-          font-family: 'Inter', sans-serif;
-          position: relative;
-          display: block;
-        }
-
-        .nav-links a::after {
-          content: '';
-          position: absolute;
-          bottom: -4px;
-          left: 0;
-          width: 0;
-          height: 1.5px;
-          background: black;
-          transition: width 0.3s;
-        }
-
-        .nav-links a:hover {
-          opacity: 1;
-        }
-        
-        .nav-links a:hover::after {
-          width: 100%;
-        }
-
-        @media screen and (max-width: 768px) {
-          .landing-nav {
-            backdrop-filter: none;
-            -webkit-backdrop-filter: none;
-            background: rgb(208, 203, 199);
-            padding: 1rem 1.5rem;
-          }
-        }
-
-        /* Mobile Menu */
-        .mobile-menu {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgb(208, 203, 199);
-          z-index: 3000;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          padding: 2rem;
-          gap: 2rem;
-          transform: translateY(-100%);
-          transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-          pointer-events: none;
-          visibility: hidden;
-          will-change: transform;
-        }
-
-        @media screen and (min-width: 769px) {
-           .mobile-menu {
-              background: rgba(208, 203, 199, 0.98);
-              backdrop-filter: blur(40px);
-              -webkit-backdrop-filter: blur(40px);
-           }
-        }
-
-        .mobile-menu.open {
-          transform: translateY(0);
-          pointer-events: auto;
-          visibility: visible;
-        }
-
-        .mobile-menu a {
-          font-family: 'Inter', sans-serif;
-          font-size: 2.5rem;
-          text-decoration: none;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: -0.04em;
-          color: black;
-          opacity: 0.8;
-          transition: opacity 0.3s, transform 0.3s;
-        }
-
-        .mobile-menu a:hover {
-          opacity: 1;
-          transform: scale(1.05);
-        }
-
-        .mobile-toggle {
-          display: none;
-          z-index: 3001;
-          background: none;
-          border: none;
-          cursor: pointer;
-        }
-
-        @media screen and (max-width: 768px) {
-           .mobile-toggle { display: block; }
-        }
-
-        /* New Sections */
-        .main-section {
-          min-height: 100vh;
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding: 120px var(--padding) var(--padding);
-          position: relative;
-          box-sizing: border-box;
-          z-index: 5;
-        }
-
-        .section-tag {
-          font-family: 'Inter', sans-serif;
-          font-weight: 900;
-          text-transform: uppercase;
-          font-size: 12px;
-          letter-spacing: 0.3em;
-          margin-bottom: 1.5rem;
-          opacity: 0.4;
-          display: block;
-        }
-
-        .hero-title {
-          font-size: clamp(40px, 10vw, 80px);
-          line-height: 0.95;
-          font-weight: 700;
-          margin: 0;
-          letter-spacing: -0.04em;
-        }
-
-        @media screen and (max-width: 900px) {
-           .about-grid { grid-template-columns: 1fr; gap: 2rem; }
-           .features-grid { grid-template-columns: 1fr !important; }
-           .main-section { 
-             padding: 100px 1.5rem 2rem; 
-             min-height: 100vh;
-             justify-content: flex-start;
-           }
-           .section-tag { margin-bottom: 0.5rem; margin-top: 2rem; }
-        }
-
-        .about-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 4rem;
-          margin-top: 4rem;
-          align-items: center;
-        }
-
-        .pill-image {
-          width: 100%;
-          border-radius: 40px;
-          aspect-ratio: 4/5;
-          object-fit: cover;
-          box-shadow: 0 30px 60px -10px rgba(0,0,0,0.15);
-        }
-
-        .features-grid {
-          display: grid;
-          grid-template-columns: repeat(1, 1fr);
-          gap: 2rem;
-          margin-top: 4rem;
-        }
-
-        @media (min-width: 768px) {
-          .features-grid {
-            grid-template-columns: repeat(3, 1fr);
-          }
-        }
-
-        .feature-card {
-           background: rgba(255,255,255,0.7);
-           backdrop-filter: blur(20px);
-           -webkit-backdrop-filter: blur(20px);
-           padding: 2.5rem;
-           border-radius: 32px;
-           border: 1px solid rgba(0,0,0,0.03);
-           transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        }
-
-        .feature-card:hover {
-           transform: translateY(-12px) scale(1.02);
-           background: white;
-           box-shadow: 0 40px 80px -20px rgba(0,0,0,0.1);
-        }
-
-        .feature-card img {
-          width: 100%;
-          aspect-ratio: 16/10;
-          object-fit: cover;
-          border-radius: 20px;
-          margin-bottom: 2rem;
-        }
-
-        .feature-card h4 {
-           font-family: 'Inter', sans-serif;
-           font-weight: 800;
-           font-size: 1.25rem;
-           margin-bottom: 0.75rem;
-           letter-spacing: -0.02em;
-        }
-
-        .feature-card p {
-           font-size: 0.9rem;
-           opacity: 0.6;
-           line-height: 1.6;
-           font-family: 'Inter', sans-serif;
-        }
-
-        @media screen and (max-width: 600px) {
-          .login-btn-landing { padding: 0.5rem 0.8rem; font-size: 10px; }
-          .section-tag { font-size: 10px; }
-        }
-
-        /* Existing Content Styles */
-        .landing-content {
-          position: relative;
-          z-index: 1;
-        }
-
-        .landing-content .section {
-          position: relative;
-          padding: var(--padding);
-          --pad2: calc(var(--padding) * 2);
-          width: calc(100vw - var(--pad2));
-          height: calc(100vh - var(--pad2));
-          margin: 0 auto;
-          z-index: 2;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-        }
-
-        @media only screen and (max-width: 600px) {
-          .landing-content .section {
-            padding: 2rem;
-            width: calc(100vw - 4rem);
-            height: calc(100vh - 4rem);
-          }
-        }
-
-        .landing-content .section.dark { color: white; background-color: black; }
-        .landing-content .section.right { text-align: right; align-items: flex-end; }
-
-        .blueprint {
-          position: relative;
-          background-color: #131C2A;
-          background-image: linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-          linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px);
-          background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
-          background-position: -2px -2px, -2px -2px, -1px -1px, -1px -1px;
-          background-attachment: fixed;
-        }
-
-        .blueprint .dark { background-color: transparent; }
-
-        .ground-container {
-          position: relative;
-          overflow: hidden;
-        }
-
-        .ground-container .parallax {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: -100px;
-          background-repeat: no-repeat;
-          background-position: top center;
-          background-size: cover;
-          transform-origin: top center;
-          opacity: 0.8;
-        }
-
-        .ground { z-index: -1; background-image: url("https://assets.codepen.io/557388/background-reduced.jpg"); }
-        .clouds { z-index: 2; background-image: url("https://assets.codepen.io/557388/clouds.png"); }
-
-        .scroll-cta, .credits { position: absolute; bottom: var(--padding); }
-        .scroll-cta { font-size: var(--font-size-medium); opacity: 0; color: black; }
-
-        .sunset {
-          background: url("https://assets.codepen.io/557388/sunset-reduced.jpg") no-repeat top center;
-          background-size: cover;
-          transform-origin: top center;
-        }
-
-        .landing-page-wrapper h1, .landing-page-wrapper h2 {
-          font-size: var(--font-size-large);
-          margin: 0vmin 0 2vmin 0;
-          font-weight: 700;
-          display: inline;
-          line-height: 1.1;
-          color: inherit;
-        }
-
-        .landing-page-wrapper h3 {
-          font-size: var(--font-size-medium);
-          font-weight: 400;
-          margin: 0;
-          opacity: 0.7;
-        }
-
-        .landing-page-wrapper p {
-           color: inherit;
-        }
-
-        .end h2 { margin-bottom: 50vh; }
-
-        .login-btn-landing {
-          background: white;
-          color: black !important;
-          padding: 0.5rem 1rem;
-          border-radius: 9999px;
-          font-weight: 700;
-          text-decoration: none;
-          z-index: 100;
-          box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-          transition: transform 0.2s, background 0.2s, color 0.2s;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          border: 1px solid rgba(0,0,0,0.2);
-          font-family: 'Inter', sans-serif;
-          letter-spacing: 0.05em;
-          text-transform: uppercase;
-          font-size: 10px;
-          white-space: nowrap;
-        }
-
-        .login-btn-landing:hover {
-          transform: translateY(-2px);
-          background: black;
-          color: white !important;
-        }
-        
-        canvas {
-          image-rendering: auto;
-        }
-      `}</style>
-
-      <div className={`mobile-menu ${isMenuOpen ? 'open' : ''}`}>
-        <a href="#home" onClick={() => setIsMenuOpen(false)}>Home</a>
-        <Link to="/about" onClick={() => setIsMenuOpen(false)}>The Story</Link>
-        <a href="#features" onClick={() => setIsMenuOpen(false)}>Features</a>
-        <a href="#how-it-works" onClick={() => setIsMenuOpen(false)}>Process</a>
-        <Link to="/contact" onClick={() => setIsMenuOpen(false)}>Contact</Link>
-        <Link to="/privacy" onClick={() => setIsMenuOpen(false)}>Privacy</Link>
+    <div ref={containerRef} className="relative w-full bg-background text-white dark:text-white">
+      {/* Fixed full-viewport 3D canvas — persists across all sections */}
+      <div className="fixed inset-0" style={{ zIndex: 0, pointerEvents: "none" }}>
+        <div className="hero-glow-layer absolute inset-0 hero-glow pointer-events-none" />
+        <Scene3D progressRef={progressRef} />
       </div>
 
-      {/* NAVIGATION BAR */}
-      <nav className="landing-nav">
-        <Link to="/" className="text-base font-black tracking-tighter" style={{ textDecoration: 'none', color: '#221F1E', alignSelf: 'center' }}>CAMPUSMARKET.</Link>
-        <div className="nav-links">
-          <a href="#home">Home</a>
-          <Link to="/about">The Story</Link>
-          <a href="#features">Features</a>
-          <a href="#how-it-works">How It Works</a>
-          <Link to="/contact">Contact</Link>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Link to="/login" className="login-btn-landing flex">
-            Get Started
-          </Link>
-          <button className="mobile-toggle" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-            {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
+      {/* Top nav */}
+      <header className="fixed top-0 left-0 right-0 z-50 px-4 md:px-0">
+        <nav className="glass mx-auto mt-4 mb-2 flex max-w-5xl items-center justify-between rounded-full px-4 md:px-6 py-2 md:py-3">
+          <span className="text-sm font-semibold tracking-tight text-white">CampusMarket</span>
+          <div className="hidden gap-8 md:flex">
+            <a href="#browse" className="text-sm text-white/70 transition hover:text-white">Browse</a>
+            <a href="#sell" className="text-sm text-white/70 transition hover:text-white">Sell</a>
+            <a href="#trust" className="text-sm text-white/70 transition hover:text-white">Trust</a>
+          </div>
+          <button 
+            onClick={() => navigate('/login')}
+            className="rounded-full bg-white px-4 py-1.5 text-xs font-medium text-black transition hover:opacity-90"
+          >
+            Sign in
           </button>
-        </div>
-      </nav>
+        </nav>
+      </header>
 
-      {/* HOME SECTION */}
-      <section id="home" className="main-section relative overflow-hidden">
-         <HomeBackground />
-         <motion.div 
-            className="relative z-10"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-         >
-            <span className="section-tag">University Marketplace</span>
-            <h1 className="hero-title select-none">Buy Secure.<br/>Sell Simple.</h1>
-            <div className="mt-12 max-w-xl">
-               <p className="text-lg opacity-60 italic">The exclusive digital hub for student exchanges. Built for high-trust transactions within your campus neighborhood.</p>
+      <main className="relative z-10">
+        {/* Hero */}
+        <section className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+          <div data-fade className="max-w-4xl">
+            <p className="mb-4 md:mb-6 text-[10px] md:text-sm font-medium uppercase tracking-[0.3em] text-white/60">
+              Built for students
+            </p>
+            <h1 className="text-4xl font-bold tracking-tightest md:text-8xl text-white drop-shadow-2xl leading-none">
+              CampusMarket.
+            </h1>
+            <p className="mt-4 md:mt-6 text-lg text-white/80 md:text-2xl drop-shadow-md">
+              Buy and sell with people on your campus.
+            </p>
+            <div className="mt-8 md:mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <button 
+                onClick={() => navigate('/login')}
+                className="w-full sm:w-auto rounded-full bg-white px-6 py-3 text-sm font-medium text-black transition hover:opacity-90 shadow-xl"
+              >
+                Browse listings
+              </button>
+              <button 
+                onClick={() => navigate('/login')}
+                className="w-full sm:w-auto glass rounded-full px-6 py-3 text-sm font-medium text-white transition hover:bg-white/20"
+              >
+                Start selling
+              </button>
             </div>
-            <div className="mt-12 flex gap-6">
-               <a href="#how-it-works" className="text-xs font-black uppercase tracking-[0.2em] underline underline-offset-8">Explore Journey</a>
+          </div>
+        </section>
+
+        {/* Browse — for buyers */}
+        <section id="browse" className="flex min-h-screen items-center px-6 md:px-20">
+          <div data-fade className="max-w-xl">
+            <p className="mb-4 text-xs md:text-sm uppercase tracking-[0.3em] text-brand-primary font-bold">For buyers</p>
+            <h2 className="text-4xl font-semibold tracking-tightest md:text-6xl text-white">
+              Textbooks, dorm gear,<br/>bikes, and more.
+            </h2>
+            <p className="mt-6 text-base md:text-lg text-white/70">
+              Skip the shipping wait and the markup. Find what you need from students
+              down the hall — at a fraction of retail.
+            </p>
+            <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { k: "Books", v: "Saved 60%" },
+                { k: "Dorm", v: "Move-in ready" },
+                { k: "Bikes", v: "Same day" },
+              ].map((s) => (
+                <div key={s.k} className="glass rounded-2xl p-4 text-center sm:text-left text-white">
+                  <div className="text-lg font-semibold">{s.k}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/50">{s.v}</div>
+                </div>
+              ))}
             </div>
-         </motion.div>
-      </section>
+          </div>
+        </section>
 
-      {/* ABOUT SECTION */}
-      <section id="about" className="main-section bg-[#c5c0bc]">
-         <div className="max-w-4xl mx-auto">
-            <motion.div
-               initial={{ opacity: 0, y: 30 }}
-               whileInView={{ opacity: 1, y: 0 }}
-               viewport={{ once: true }}
-               transition={{ duration: 0.8 }}
-            >
-               <span className="section-tag">The Story</span>
-               <h2 className="text-5xl font-bold tracking-tight">Built by students,<br/>for the community.</h2>
-               
-               <div className="mt-8 space-y-6">
-                  <p className="text-lg leading-relaxed">CampusMarket was founded with a singular purpose: to eliminate the friction in university second-hand commerce. We saw students struggling with shipping fees and shady meetups, so we built something better.</p>
-                  <p className="text-lg leading-relaxed">By restricting access to verified university emails, we ensure every person you meet is a peer. It's a high-trust, low-impact way to keep gear in use and money in student pockets.</p>
-                  
-                  <div className="pt-6 grid grid-cols-2 gap-8">
-                     <div>
-                        <h4 className="font-black text-3xl">12k+</h4>
-                        <p className="text-sm uppercase tracking-widest opacity-50 font-sans">Active Users</p>
-                     </div>
-                     <div>
-                        <h4 className="font-black text-3xl">45k</h4>
-                        <p className="text-sm uppercase tracking-widest opacity-50 font-sans">Items Traded</p>
-                     </div>
-                  </div>
-               </div>
-            </motion.div>
-         </div>
-      </section>
-
-      {/* FEATURES SECTION */}
-      <section id="features" className="main-section bg-[#D0CBC7]">
-         <div className="text-center mb-12">
-            <span className="section-tag">Platform Features</span>
-            <h2 className="text-5xl font-bold">Everything you need<br/>to trade locally.</h2>
-         </div>
-
-         <div className="features-grid">
-            {[
-               {
-                  title: "Secure Peer ID",
-                  desc: "Every account is tied to a verified university email. Our multi-step verification process ensures the person you're meeting is exactly who they say they are."
-               },
-               {
-                  title: "AI Listing Power",
-                  desc: "Draft items in seconds. Our intelligent assistant helps you craft effective descriptions and prices based on campus trends, so you can focus on your studies."
-               },
-               {
-                  title: "Zero Packaging",
-                  desc: "Since all trades happen on campus, there's no need for boxes, plastic wrap, or carbon-heavy shipping. It's the greenest way to shop."
-               }
-            ].map((feature, i) => (
-               <motion.div 
-                  key={i}
-                  className="feature-card"
-                  initial={{ opacity: 0, y: 40, scale: 0.95 }}
-                  whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                  viewport={{ once: true, margin: "-100px" }}
-                  transition={{ 
-                     duration: 0.8, 
-                     delay: i * 0.15,
-                     ease: [0.16, 1, 0.3, 1]
-                  }}
-               >
-                  <h4>{feature.title}</h4>
-                  <p>{feature.desc}</p>
-               </motion.div>
-            ))}
-         </div>
-      </section>
-
-      {/* MARKETPLACE PREVIEW SECTION - MANDATORY FOR ADSENSE APPROVAL */}
-      <MarketplacePreview />
-
-      {/* HOW IT WORKS SECTION */}
-      <section id="how-it-works" className="py-32 px-6 bg-white/20">
-         <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-20">
-               <span className="section-tag">Smooth Process</span>
-               <h2 className="text-5xl font-black text-[#221F1E] tracking-tighter">How CampusMarket Works</h2>
-               <p className="mt-4 text-[#221F1E]/60 font-medium">Three simple steps to better student trading.</p>
+        {/* Sell — for sellers */}
+        <section id="sell" className="flex min-h-screen items-center justify-end px-6 md:px-20">
+          <div data-fade className="max-w-xl text-center sm:text-right">
+            <p className="mb-4 text-xs md:text-sm uppercase tracking-[0.3em] text-brand-primary font-bold">For sellers</p>
+            <h2 className="text-4xl font-semibold tracking-tightest md:text-6xl text-white">
+              List in 30 seconds.<br/>Get paid fast.
+            </h2>
+            <p className="mt-6 text-base md:text-lg text-white/70">
+              Snap a photo, set a price, post it. Your listing reaches every student
+              on your campus instantly. No fees on your first ten sales.
+            </p>
+            <div className="mt-8 md:mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { k: "0%", v: "starter fees" },
+                { k: "30s", v: "to list" },
+                { k: "24h", v: "avg sale" },
+              ].map((s) => (
+                <div key={s.v} className="glass rounded-2xl p-4 text-white">
+                  <div className="text-2xl md:text-3xl font-semibold">{s.k}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/50">{s.v}</div>
+                </div>
+              ))}
             </div>
+          </div>
+        </section>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-               {[
-                  {
-                     step: "01",
-                     title: "Browse & Discover",
-                     desc: "Log in with your university email to see hundreds of listings from students right on your campus. Sort by category, price, or condition."
-                  },
-                  {
-                     step: "02",
-                     title: "Secure Connect",
-                     desc: "Chat directly with the seller inside our platform. Ask questions, request more photos, and agree on a safe campus meetup spot."
-                  },
-                  {
-                     step: "03",
-                     title: "Direct Trade",
-                     desc: "Meet on campus—usually at the Student Union or a library—to inspect the item and finalize the deal. No shipping, no wait, no fees."
-                  }
-               ].map((item, i) => (
-                  <motion.div 
-                     key={i}
-                     initial={{ opacity: 0, y: 20 }}
-                     whileInView={{ opacity: 1, y: 0 }}
-                     viewport={{ once: true }}
-                     transition={{ delay: i * 0.1 }}
-                     className="relative p-10 bg-white/40 rounded-[40px] border border-black/5"
-                  >
-                     <span className="text-5xl font-black text-[#EF895F]/20 absolute top-8 right-10">{item.step}</span>
-                     <h3 className="text-2xl font-black text-[#221F1E] mb-4 tracking-tight">{item.title}</h3>
-                     <p className="text-[#221F1E]/60 text-sm leading-relaxed font-medium">{item.desc}</p>
-                  </motion.div>
-               ))}
+        {/* Trust */}
+        <section id="trust" className="flex min-h-screen items-center justify-center px-6 text-center">
+          <div data-fade className="max-w-3xl">
+            <p className="mb-4 text-xs md:text-sm uppercase tracking-[0.3em] text-brand-primary font-bold">Verified students</p>
+            <h2 className="text-4xl font-semibold tracking-tightest md:text-7xl text-white">
+              Only your campus.
+            </h2>
+            <p className="mt-6 text-base md:text-lg text-white/70">
+              Every account is verified with a student email. Meet on campus, in
+              public, in daylight. Rate every trade so the community stays trusted.
+            </p>
+          </div>
+        </section>
+
+        {/* Final CTA */}
+        <section className="flex min-h-screen items-center justify-center px-6 text-center">
+          <div data-fade className="max-w-3xl">
+            <h2 className="text-4xl font-bold tracking-tightest md:text-8xl text-white">
+              Join your campus.
+            </h2>
+            <p className="mt-6 text-lg md:text-xl text-white/80">
+              Free to join with your student email.
+            </p>
+            <div className="mt-8 md:mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <button 
+                onClick={() => navigate('/login')}
+                className="w-full sm:w-auto rounded-full bg-white px-8 py-4 text-sm font-medium text-black transition hover:opacity-90 shadow-2xl"
+              >
+                Get started
+              </button>
+              <button className="w-full sm:w-auto glass rounded-full px-8 py-4 text-sm font-medium text-white transition hover:bg-white/20">
+                How it works
+              </button>
             </div>
-         </div>
-      </section>
+          </div>
+        </section>
 
-      {/* EXPERIENCE SECTION (THE AIRPLANE) */}
-      <section id="journey" className="w-full">
-         <div className="landing-content" ref={containerRef}>
-            {/* The airplane/three.js interaction content (UNCHANGED IN STRUCTURE) */}
-            <div className="trigger"></div>
-            <div className="section">
-              <h1>Marketplace.</h1>
-              <h3>The campus guide.</h3>
-              <p>Everything you need, right where you live.</p>
-              <div className="scroll-cta">Scroll</div>
-            </div>
-
-            <div className="section right">
-              <h2>It's kinda like a mall...</h2>
-            </div>
-
-            <div className="ground-container">
-              <div className="parallax ground"></div>
-              <div className="section right">
-                <h2>..except it's built for students.</h2>
-                <p>No more shipping fees.</p>
-              </div>
-
-              <div className="section">
-                <h2>Buy and sell locally.</h2>
-                <p>Exchange between classes.</p>
-              </div>
-
-              <div className="section right">
-                <h2>Safe and verified.</h2>
-                <p>Student community only.</p>
-              </div>
-              <div className="parallax clouds"></div>
-            </div>
-
-            <div className="blueprint">
-              <div className="section dark ">
-                <h2>Stats and Savings.</h2>
-                <p>The marketplace by the numbers...</p>
-              </div>
-              <div className="section dark length">
-                <h2>Reach.</h2>
-                <p>Hundreds of listings.</p>
-              </div>
-              <div className="section dark wingspan">
-                <h2>Speed.</h2>
-                <p>Instant chat and pickup.</p>
-              </div>
-              <div className="section dark phalange">
-                <h2>Trust.</h2>
-                <p>Verified Student IDs.</p>
-              </div>
-              <div className="section dark">
-                <h2>Cycle.</h2>
-                <p>Sustainable student reuse.</p>
-              </div>
-            </div>
-            
-            <div className="sunset">
-              <div className="section"></div>
-              <div className="section end">
-                <h2>Start.</h2>
-                <ul className="credits">
-                  <li className="mt-4">Welcome to the inner circle</li>
-                  <li>Campus Market © 2026</li>
-                </ul>
-              </div>
-            </div>
-         </div>
-      </section>
-
-      {/* FOOTER */}
-      <Footer />
+        <footer className="relative z-10 py-10 text-center text-xs text-white/40">
+          © 2026 CampusMarket. Built by students, for students.
+        </footer>
+      </main>
     </div>
   );
-};
+}
