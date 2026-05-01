@@ -4,6 +4,14 @@
 
 CampusMart is a student-focused marketplace web application designed to simplify buying and selling within the campus community. It provides a secure and easy-to-use platform where students can list products, browse items, and complete transactions efficiently.
 
+Founding Team
+Axzel C. Baril
+Justine M. Abainza
+Isaiah Micah L. Santiago
+Xymon Ace M. Virgo
+Nhazlie C. Millares
+Benzel David Reign R. Reynaldo
+
 ## Features
 
 * User Authentication (Login & Signup)
