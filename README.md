@@ -1,26 +1,60 @@
-# CampusMarket Deployment Guide (Vercel)
+# CampusMart
 
-This project has been adapted for deployment on Vercel. 
+## Project Overview
 
-## Vercel Setup
+CampusMart is a student-focused marketplace web application designed to simplify buying and selling within the campus community. It provides a secure and easy-to-use platform where students can list products, browse items, and complete transactions efficiently.
 
-1.  **Framework Preset**: Ensure "Vite" is selected as the Framework Preset in your Vercel project settings.
-2.  **Environment Variables**: Add the following Environment Variables in the Vercel Dashboard:
-    *   `GEMINI_API_KEY`: Your Google AI API key (from Google AI Studio).
-    *   `VITE_APP_URL`: Your Vercel deployment URL (e.g., `https://campusmarket.vercel.app`).
-3.  **Routing**: A `vercel.json` has been added to handle Single Page Application (SPA) routing. This ensures that deep links (like `/market` or `/profile`) work correctly when refreshed.
+**Founding Team:**
 
-## Firebase Configuration
+- Axzel C. Baril  
+- Justine M. Abainza  
+- Isaiah Micah L. Santiago  
+- Xymon Ace M. Virgo  
+- Nhazlie C. Millares  
+- Benzel David Reign R. Reynaldo  
 
-1.  **Whitelisting**: Go to the [Firebase Console](https://console.firebase.google.com/), select your project, then navigate to **Authentication > Settings > Authorized Domains**.
-2.  **Add Domain**: Add your Vercel deployment domain (e.g., `campusmarket.vercel.app`) to the list of authorized domains. This is required for Google Sign-In to function.
+## Features
 
-## Local Development
+* User Authentication (Login & Signup)
+* Product Listing and Management
+* Search and Browse Marketplace
+* Secure Checkout System
+* Seller Dashboard for managing products and sales
+* Responsive UI for mobile and desktop users
 
-```bash
-npm install
-npm run dev
-```
+## Tech Stack
+
+* Frontend: HTML, CSS, JavaScript / React
+* Database: Firebase / Supabase
+* Deployment: Vercel
+* Version Control: GitHub
+
+## System Flow
+
+1. User lands on the homepage
+2. User logs in or signs up
+3. Seller lists a product
+4. Buyer browses and selects an item
+5. Buyer completes checkout
+6. Order is processed and recorded in the system
+
+## Future Improvements
+
+* Real-time chat between buyers and sellers
+* Product rating and review system
+* Order tracking system
+* Notification system
+* Mobile application version
+
+## Installation
+
+1. Clone the repository
+2. Install dependencies
+3. Run the development server
+4. Open the application in your browser
+
+(Replace with actual commands based on your setup)
+
 
 ## License
 
