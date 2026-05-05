@@ -886,7 +886,7 @@ const LoginPage = () => {
   };
 
   const themeBackground = "#f3f4f6";
-  const themePrimaryColor = "#EF895F";
+  const themePrimaryColor = "#98FF98";
   const themeColor = "#000000";
   const isDarkTheme = false;
 

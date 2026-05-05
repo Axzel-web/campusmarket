@@ -62,20 +62,23 @@ export default function Scene3D({
 
       // ---- Scenes ----
       const sceneMain = new THREE.Scene();
+      const mintGreen = color(0x98FF98);
+      const brightMint = color(0x70E0AF); // Lighter mint accent
+
       if (solidBg) {
-        sceneMain.background = new THREE.Color(0x0a0a14);
+        sceneMain.background = new THREE.Color(0x1a2e25); // Slightly lighter minty background
       } else {
-        // Vertical gradient background using TSL normalWorld
+        // Vertical gradient background: Light Mint to Bright Mint
         sceneMain.backgroundNode = normalWorld.y.mix(
-          color(0xEF895F), // Onboarding Orange
-          color(0xF5E8E2), // Onboarding Subtle Accent
+          mintGreen,
+          brightMint,
         );
       }
 
       const scenePortal = new THREE.Scene();
       scenePortal.backgroundNode = mx_worley_noise_float(
         normalWorld.mul(20).add(vec2(0, time.oneMinus())),
-      ).mul(color(0xEF895F));
+      ).mul(mintGreen);
 
       // ---- Camera ----
       const camera = new THREE.PerspectiveCamera(50, width / height, 0.01, 30);
@@ -88,9 +91,9 @@ export default function Scene3D({
       // ---- Lights ----
       const light = new THREE.PointLight(0xffffff, 1);
       light.position.set(0, 1, 5);
-      light.power = 17000;
+      light.power = 22000; // Brightened light
 
-      sceneMain.add(new THREE.HemisphereLight(0xEF895F, 0xF5E8E2, 7));
+      sceneMain.add(new THREE.HemisphereLight(0x98FF98, 0x70E0AF, 8)); // Brightened hemi
       sceneMain.add(light);
       scenePortal.add(light.clone());
 
@@ -113,7 +116,7 @@ export default function Scene3D({
       }
       renderer.setSize(width, height);
       renderer.toneMapping = THREE.LinearToneMapping;
-      renderer.toneMappingExposure = 0.15;
+      renderer.toneMappingExposure = 0.25; // Increased exposure for more vibrance
 
       try {
         await renderer.init();

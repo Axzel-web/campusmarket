@@ -10,14 +10,14 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-hind: "Hind Siliguri", sans-serif;
 
-  /* Onboarding Inspired Palette */
-  --color-bg-light: #fdfaf9;
-  --color-brand-primary: #EF895F;
-  --color-brand-primary-hover: #D9734A;
-  --color-text-main: #221F1E;
+  /* Mint Green Palette */
+  --color-bg-light: #f8fbf9;
+  --color-brand-primary: #98FF98;
+  --color-brand-primary-hover: #70E0AF;
+  --color-text-main: #1a221f;
   --color-text-muted: #6b7280;
   --color-border-main: #e5e7eb;
-  --color-accent-subtle: #F5E8E2;
+  --color-accent-subtle: #E0F7EF;
   --color-accent-yellow: #fffdf2;
   --color-border-yellow: #fde68a;
 
@@ -34,7 +34,7 @@
   }
 
   .hero-glow {
-    background: radial-gradient(circle at 50% 50%, #EF895F 0%, transparent 70%);
+    background: radial-gradient(circle at 50% 50%, #98FF98 0%, transparent 70%);
   }
 
   .glass {

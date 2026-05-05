@@ -55,15 +55,7 @@ export default function LandingPage() {
         );
       });
 
-      gsap.to(".hero-glow-layer", {
-        opacity: 0.2,
-        scrollTrigger: {
-          trigger: containerRef.current,
-          start: "80% bottom",
-          end: "bottom bottom",
-          scrub: true,
-        },
-      });
+      // No context needed anymore if we removed the glow layer animation
     }, containerRef);
 
     return () => ctx.revert();
@@ -75,7 +67,6 @@ export default function LandingPage() {
     <div ref={containerRef} className="relative w-full bg-background text-white dark:text-white">
       {/* Fixed full-viewport 3D canvas — persists across all sections */}
       <div className="fixed inset-0" style={{ zIndex: 0, pointerEvents: "none" }}>
-        <div className="hero-glow-layer absolute inset-0 hero-glow pointer-events-none" />
         <Scene3D progressRef={progressRef} />
       </div>
 
