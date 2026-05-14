@@ -32,7 +32,11 @@ import {
   X,
   Trash2,
   CheckCircle,
-  Zap
+  Zap,
+  Share2,
+  Copy,
+  ExternalLink,
+  Check
 } from 'lucide-react';
 import { SpiderCursor } from "./components/ui/spider-cursor";
 import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication, Transaction } from './types';
@@ -45,6 +49,7 @@ import { LoadingAnimation } from './components/LoadingAnimation';
 import { AboutPage } from './components/AboutPage';
 import { ContactPage } from './components/ContactPage';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
+import { SecuritySettingsPage } from './components/SecuritySettingsPage';
 import { supabase } from './lib/supabase';
 import { uploadProductImage } from './services/productService';
 import { SpotlightTutorial } from './components/SpotlightTutorial';
@@ -200,7 +205,7 @@ const Navbar = () => {
       <div className="max-w-[1280px] mx-auto h-full flex items-center px-4 md:px-6 justify-between">
         <div className="flex items-center gap-4 md:gap-8 flex-1">
           {!showSearch && (
-            <Link to="/market" className="text-xl md:text-2xl font-extrabold text-brand-primary tracking-tight whitespace-nowrap">CampusMarket</Link>
+            <Link to="/market" className="text-xl md:text-2xl font-extrabold text-brand-deep tracking-tight whitespace-nowrap">CampusMart</Link>
           )}
           
           <div className={cn(
@@ -270,10 +275,10 @@ const Sidebar = () => {
             key={path}
             to={path}
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all mb-1",
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl font-bold text-sm transition-all mb-1",
               location.pathname === path 
-                ? "bg-accent-subtle text-brand-primary shadow-sm" 
-                : "text-text-muted hover:bg-bg-light hover:text-text-main"
+                ? "bg-accent-subtle text-brand-deep shadow-sm" 
+                : "text-brand-deep/70 hover:bg-bg-light hover:text-brand-deep"
             )}
           >
             <Icon size={18} />
@@ -457,14 +462,34 @@ const RightPanel = () => {
 };
 
 const ListingCard = ({ listing }: { listing: Listing }) => {
-  const { toggleFavorite, favorites } = useApp();
+  const { toggleFavorite, favorites, addNotification } = useApp();
   const isFavorite = favorites.includes(listing.id);
+  const [showShare, setShowShare] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowShare(!showShare);
+  };
+
+  const copyLink = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = `${window.location.origin}/listing/${listing.id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      addNotification("Link copied to clipboard!", "success");
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-xl overflow-hidden border border-border-main group cursor-pointer flex flex-col h-full"
+      onMouseLeave={() => setShowShare(false)}
+      className="bg-white rounded-xl overflow-hidden border border-border-main group cursor-pointer flex flex-col h-full relative"
     >
       <Link to={`/listing/${listing.id}`} className="flex-1 flex flex-col">
         <div className="relative aspect-[4/3] overflow-hidden bg-bg-light">
@@ -487,18 +512,61 @@ const ListingCard = ({ listing }: { listing: Listing }) => {
               <span className="text-[10px] font-bold text-brand-primary uppercase tracking-widest animate-pulse">Loading...</span>
             </div>
           )}
-          <button 
-            onClick={(e) => {
-              e.preventDefault();
-              toggleFavorite(listing.id);
-            }}
-            className={cn(
-              "absolute top-2 right-2 p-1.5 rounded-full backdrop-blur transition-colors",
-              isFavorite ? "bg-brand-primary text-white" : "bg-white/80 text-text-muted hover:bg-white"
+          
+          <div className="absolute top-2 right-2 flex gap-1.5 z-20">
+            <button 
+              onClick={handleShare}
+              className={cn(
+                "p-1.5 rounded-full backdrop-blur transition-all active:scale-90",
+                showShare ? "bg-brand-primary text-white" : "bg-white/80 text-text-muted hover:bg-white"
+              )}
+            >
+              <Share2 size={13} />
+            </button>
+            <button 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleFavorite(listing.id);
+              }}
+              className={cn(
+                "p-1.5 rounded-full backdrop-blur transition-all active:scale-90",
+                isFavorite ? "bg-red-500 text-white" : "bg-white/80 text-text-muted hover:bg-white"
+              )}
+            >
+              <Heart size={13} fill={isFavorite ? "currentColor" : "none"} />
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {showShare && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 5 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 5 }}
+                className="absolute top-10 right-2 w-40 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/50 p-2 z-30"
+              >
+                <button 
+                  onClick={copyLink}
+                  className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-bg-light transition-colors text-xs font-bold text-text-main"
+                >
+                  <div className="flex items-center gap-2">
+                    {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                    {copied ? "Copied!" : "Copy Link"}
+                  </div>
+                </button>
+                <a
+                  href={`https://twitter.com/intent/tweet?text=Check out this on CampusMart: ${listing.title}&url=${encodeURIComponent(`${window.location.origin}/listing/${listing.id}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-bg-light transition-colors text-xs font-bold text-text-main"
+                >
+                  <ExternalLink size={14} /> Share to Feed
+                </a>
+              </motion.div>
             )}
-          >
-            <Heart size={14} fill={isFavorite ? "currentColor" : "none"} />
-          </button>
+          </AnimatePresence>
         </div>
         <div className="p-3 flex flex-col flex-1">
           <p className="text-brand-primary font-bold text-base">₱{listing.price.toLocaleString()}</p>
@@ -542,7 +610,7 @@ const MobileTabs = () => {
       <div className="relative w-full max-w-[440px] h-16 bg-white shadow-[0_-5px_25px_rgba(0,0,0,0.08)] rounded-3xl flex pointer-events-auto overflow-visible">
         {/* Magic Indicator */}
         <motion.div 
-          className="absolute top-[-50%] w-16 h-16 bg-brand-primary rounded-full border-[6px] border-[#f3f4f6] shadow-xl z-0"
+          className="absolute top-[-50%] w-16 h-16 bg-brand-deep rounded-full border-[6px] border-[#f3f4f6] shadow-xl z-0"
           initial={false}
           animate={{
             left: `calc(${activeIndex * 25}% + 12.5% - 32px)`,
@@ -566,7 +634,7 @@ const MobileTabs = () => {
               <motion.div
                 animate={{
                   y: isActive ? -32 : 0,
-                  color: isActive ? '#FFFFFF' : '#94A3B8',
+                  color: isActive ? '#FFFFFF' : '#64748b',
                   scale: isActive ? 1.1 : 1
                 }}
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
@@ -706,8 +774,8 @@ const HomePage = () => {
               className={cn(
                 "flex items-center gap-1.5 transition-colors px-3 py-1.5 rounded-lg border",
                 showFilters || minPrice || maxPrice || minRating > 0 
-                  ? "border-brand-primary text-brand-primary bg-accent-subtle" 
-                  : "border-border-main hover:border-brand-primary hover:text-brand-primary"
+                  ? "border-brand-deep text-brand-deep bg-accent-subtle" 
+                  : "border-border-main hover:border-brand-deep hover:text-brand-deep"
               )}
             >
               <Filter size={14} /> Filters
@@ -793,8 +861,8 @@ const HomePage = () => {
               className={cn(
                 "px-5 py-2 rounded-full text-xs font-bold transition-all border whitespace-nowrap",
                 activeCategory === cat 
-                  ? "bg-brand-primary text-white border-brand-primary shadow-sm"
-                  : "bg-white text-text-muted border-border-main hover:border-brand-primary hover:text-brand-primary"
+                  ? "bg-brand-primary text-brand-deep border-brand-primary shadow-sm"
+                  : "bg-white text-text-muted border-border-main hover:border-brand-deep hover:text-brand-deep"
               )}
             >
               {cat}
@@ -914,7 +982,7 @@ const LoginPage = () => {
             <div className="w-full max-w-[120px] sm:max-w-[150px] mb-3">
               <img 
                 src="https://raw.githubusercontent.com/hicodersofficial/glassmorphism-login-form/master/assets/illustration.png" 
-                alt="CampusMarket" 
+                alt="CampusMart" 
                 className="w-full h-auto drop-shadow-xl animate-float"
               />
             </div>
@@ -1181,7 +1249,7 @@ const ProfilePage = () => {
               <div className="relative z-10">
                 <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[9px] font-black uppercase tracking-wider mb-3">Become a Seller</span>
                 <h3 className="font-black text-xl mb-1">Get Student Verified</h3>
-                <p className="text-white/80 text-xs mb-6 max-w-[200px] font-medium">Join 500+ active student sellers on CampusMarket tonight.</p>
+                <p className="text-white/80 text-xs mb-6 max-w-[200px] font-medium">Join 500+ active student sellers on CampusMart tonight.</p>
                 <div className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-brand-primary rounded-xl font-black text-xs shadow-lg group-hover:scale-105 transition-transform">
                   Start Application <ArrowLeft className="rotate-180" size={16} />
                 </div>
@@ -1520,7 +1588,7 @@ const VerificationPage = () => {
                 <ShieldCheck size={14} /> Student Identity Verification
               </p>
               <p className="text-text-muted text-[11px] mt-1 leading-relaxed">
-                To keep CampusMarket safe for everyone, we require all sellers to verify their student status. Your ID photo is encrypted and only used for verification.
+                To keep CampusMart safe for everyone, we require all sellers to verify their student status. Your ID photo is encrypted and only used for verification.
               </p>
             </div>
 
@@ -1672,7 +1740,7 @@ const SellPage = () => {
           <ShieldCheck size={40} />
         </div>
         <h1 className="text-2xl font-bold mb-2 text-text-main">Complete Seller Verification</h1>
-        <p className="text-text-muted mb-8 max-w-sm">To keep CampusMarket safe, only verified students can sell products. Complete your verification to start listing.</p>
+        <p className="text-text-muted mb-8 max-w-sm">To keep CampusMart safe, only verified students can sell products. Complete your verification to start listing.</p>
         <Link to="/verify" className="px-8 py-3 bg-brand-primary text-white rounded-xl font-bold shadow-lg scale-100 active:scale-95 transition-all">
           Go to Verification
         </Link>
@@ -3190,7 +3258,7 @@ const OnboardingPage = () => {
         });
 
         localStorage.removeItem('campusListingTutorialSeen');
-        addNotification("Welcome to CampusMarket! Your profile is ready.", "success");
+        addNotification("Welcome to CampusMart! Your profile is ready.", "success");
         navigate('/market');
     };
 
@@ -3789,6 +3857,7 @@ const AppContent = () => {
                             <Route path="/chat/:id" element={<ChatPage />} />
                             <Route path="/messages" element={<MessagesListPage />} />
                             <Route path="/edit-profile" element={<EditProfilePage />} />
+                            <Route path="/settings" element={<SecuritySettingsPage />} />
                             <Route path="/dashboard" element={<SellerDashboardPage />} />
                           </Routes>
                         </main>

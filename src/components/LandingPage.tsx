@@ -73,11 +73,11 @@ export default function LandingPage() {
       {/* Top nav */}
       <header className="fixed top-0 left-0 right-0 z-50 px-4 md:px-0">
         <nav className="glass mx-auto mt-4 mb-2 flex max-w-5xl items-center justify-between rounded-full px-4 md:px-6 py-2 md:py-3">
-          <span className="text-sm font-semibold tracking-tight text-white">CampusMarket</span>
+          <span className="text-sm font-semibold tracking-tight text-white">CampusMart <span className="text-[10px] opacity-60 ml-1 font-normal">PLSP</span></span>
           <div className="hidden gap-8 md:flex">
-            <a href="#browse" className="text-sm text-white/70 transition hover:text-white">Browse</a>
+            <a href="#browse" className="text-sm text-white/70 transition hover:text-white">Shop</a>
             <a href="#sell" className="text-sm text-white/70 transition hover:text-white">Sell</a>
-            <a href="#trust" className="text-sm text-white/70 transition hover:text-white">Trust</a>
+            <a href="#trust" className="text-sm text-white/70 transition hover:text-white">Community</a>
           </div>
           <button 
             onClick={() => navigate('/login')}
@@ -93,13 +93,13 @@ export default function LandingPage() {
         <section className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
           <div data-fade className="max-w-4xl">
             <p className="mb-4 md:mb-6 text-[10px] md:text-sm font-medium uppercase tracking-[0.3em] text-white/60">
-              Built for students
+              Fueling your hustle @ PLSP
             </p>
             <h1 className="text-4xl font-bold tracking-tightest md:text-8xl text-white drop-shadow-2xl leading-none">
-              CampusMarket.
+              CampusMart.
             </h1>
             <p className="mt-4 md:mt-6 text-lg text-white/80 md:text-2xl drop-shadow-md">
-              Buy and sell with people on your campus.
+              The digital hub for the Green and Gold economy.
             </p>
             <div className="mt-8 md:mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
               <button 
@@ -121,21 +121,21 @@ export default function LandingPage() {
         {/* Browse — for buyers */}
         <section id="browse" className="flex min-h-screen items-center px-6 md:px-20">
           <div data-fade className="max-w-xl">
-            <p className="mb-4 text-xs md:text-sm uppercase tracking-[0.3em] text-brand-primary font-bold">For buyers</p>
+            <p className="mb-4 text-xs md:text-sm uppercase tracking-[0.3em] text-brand-primary font-bold">For PLSP Student Buyers</p>
             <h2 className="text-4xl font-semibold tracking-tightest md:text-6xl text-white">
-              Textbooks, dorm gear,<br/>bikes, and more.
+              Books, Snacks, Printing,<br/>and dorm gear.
             </h2>
             <p className="mt-6 text-base md:text-lg text-white/70">
-              Skip the shipping wait and the markup. Find what you need from students
-              down the hall — at a fraction of retail.
+              Skip the shipping wait and delivery fees. Find textbooks, student-made snacks, and 
+              local services from classmates you can trust.
             </p>
             <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
-                { k: "Books", v: "Saved 60%" },
-                { k: "Dorm", v: "Move-in ready" },
-                { k: "Bikes", v: "Same day" },
+                { k: "Essentials", v: "Books & Gear" },
+                { k: "Hustles", v: "Snacks & Crafts" },
+                { k: "Services", v: "Print & Help" },
               ].map((s) => (
-                <div key={s.k} className="glass rounded-2xl p-4 text-center sm:text-left text-white">
+                <div key={s.k} className="glass border-l-4 border-yellow-400 rounded-2xl p-4 text-center sm:text-left text-white">
                   <div className="text-lg font-semibold">{s.k}</div>
                   <div className="text-[10px] uppercase tracking-widest text-white/50">{s.v}</div>
                 </div>
@@ -147,21 +147,21 @@ export default function LandingPage() {
         {/* Sell — for sellers */}
         <section id="sell" className="flex min-h-screen items-center justify-end px-6 md:px-20">
           <div data-fade className="max-w-xl text-center sm:text-right">
-            <p className="mb-4 text-xs md:text-sm uppercase tracking-[0.3em] text-brand-primary font-bold">For sellers</p>
+            <p className="mb-4 text-xs md:text-sm uppercase tracking-[0.3em] text-brand-primary font-bold">Student Entrepreneurs</p>
             <h2 className="text-4xl font-semibold tracking-tightest md:text-6xl text-white">
-              List in 30 seconds.<br/>Get paid fast.
+              List in 30 seconds.<br/>Keep your profit.
             </h2>
             <p className="mt-6 text-base md:text-lg text-white/70">
-              Snap a photo, set a price, post it. Your listing reaches every student
-              on your campus instantly. No fees on your first ten sales.
+              Turn your skills or extra gear into a side hustle. Reach thousands of PLSP students 
+              instantly with zero shipping hassle—just face-to-face meetups.
             </p>
             <div className="mt-8 md:mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
-                { k: "0%", v: "starter fees" },
-                { k: "30s", v: "to list" },
-                { k: "24h", v: "avg sale" },
+                { k: "0%", v: "membership fee" },
+                { k: "Verified", v: "Campus Badges" },
+                { k: "Dashboard", v: "Track Earnings" },
               ].map((s) => (
-                <div key={s.v} className="glass rounded-2xl p-4 text-white">
+                <div key={s.v} className="glass border-r-4 border-yellow-400 rounded-2xl p-4 text-white">
                   <div className="text-2xl md:text-3xl font-semibold">{s.k}</div>
                   <div className="text-[10px] uppercase tracking-widest text-white/50">{s.v}</div>
                 </div>
@@ -173,13 +173,13 @@ export default function LandingPage() {
         {/* Trust */}
         <section id="trust" className="flex min-h-screen items-center justify-center px-6 text-center">
           <div data-fade className="max-w-3xl">
-            <p className="mb-4 text-xs md:text-sm uppercase tracking-[0.3em] text-brand-primary font-bold">Verified students</p>
+            <p className="mb-4 text-xs md:text-sm uppercase tracking-[0.3em] text-brand-primary font-bold">PLSP-Only Access</p>
             <h2 className="text-4xl font-semibold tracking-tightest md:text-7xl text-white">
-              Only your campus.
+              A Trusted Digital Ecosystem.
             </h2>
             <p className="mt-6 text-base md:text-lg text-white/70">
-              Every account is verified with a student email. Meet on campus, in
-              public, in daylight. Rate every trade so the community stays trusted.
+              Every user is a verified student. Meet safely in campus hallways or 
+              tambayans. Zero delivery fees, zero strangers, 100% Green and Gold.
             </p>
           </div>
         </section>
@@ -208,7 +208,7 @@ export default function LandingPage() {
         </section>
 
         <footer className="relative z-10 py-10 text-center text-xs text-white/40">
-          © 2026 CampusMarket. Built by students, for students.
+          © 2026 CampusMart — PLSP Campus Marketplace. Made for the community by PLSP CpE Students.
         </footer>
       </main>
     </div>

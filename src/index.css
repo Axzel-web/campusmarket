@@ -14,6 +14,9 @@
   --color-bg-light: #f8fbf9;
   --color-brand-primary: #98FF98;
   --color-brand-primary-hover: #70E0AF;
+  --color-brand-deep: #166534; /* Darker green for text readability */
+  --color-brand-primary-text: #166534;
+  --color-accent-gold: #FACC15;
   --color-text-main: #1a221f;
   --color-text-muted: #6b7280;
   --color-border-main: #e5e7eb;
@@ -74,7 +77,7 @@
 .uiverse-card {
   --uiverse-white: hsl(0, 0%, 100%);
   --uiverse-black: hsl(240, 15%, 9%);
-  --uiverse-primary: #EF895F; /* Using onboarding orange */
+  --uiverse-primary: var(--color-brand-primary);
   
   position: relative;
   overflow: hidden;
