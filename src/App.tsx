@@ -668,7 +668,7 @@ const CategoriesPage = () => {
   const categories = ['Gadgets', 'Books', 'Uniforms', 'Services', 'Others'];
 
   return (
-    <div className="flex-1 px-6 py-6 overflow-y-auto no-scrollbar">
+    <div className="flex-1 px-6 pt-6 pb-28 sm:pb-6 overflow-y-auto no-scrollbar">
       <h1 className="text-2xl font-bold text-text-main mb-6">Browse Categories</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {categories.map(cat => (
@@ -692,7 +692,7 @@ const FavoritesPage = () => {
   const favoriteListings = listings.filter(l => favorites.includes(l.id));
 
   return (
-    <div className="flex-1 px-6 py-6 overflow-y-auto no-scrollbar">
+    <div className="flex-1 px-6 pt-6 pb-28 sm:pb-6 overflow-y-auto no-scrollbar">
       <h1 className="text-2xl font-bold text-text-main mb-6">Your Favorites</h1>
       {favoriteListings.length > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
@@ -764,7 +764,7 @@ const HomePage = () => {
   });
 
   return (
-    <div className="flex-1 px-6 py-6 overflow-y-auto no-scrollbar">
+    <div className="flex-1 px-6 pt-6 pb-28 sm:pb-6 overflow-y-auto no-scrollbar">
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-text-main">Marketplace</h2>
@@ -861,7 +861,7 @@ const HomePage = () => {
               className={cn(
                 "px-5 py-2 rounded-full text-xs font-bold transition-all border whitespace-nowrap",
                 activeCategory === cat 
-                  ? "bg-brand-primary text-brand-deep border-brand-primary shadow-sm"
+                  ? "bg-brand-primary text-white border-brand-primary shadow-sm"
                   : "bg-white text-text-muted border-border-main hover:border-brand-deep hover:text-brand-deep"
               )}
             >
@@ -954,7 +954,7 @@ const LoginPage = () => {
   };
 
   const themeBackground = "#f3f4f6";
-  const themePrimaryColor = "#98FF98";
+  const themePrimaryColor = "#166534";
   const themeColor = "#000000";
   const isDarkTheme = false;
 
@@ -1059,7 +1059,7 @@ const LoginPage = () => {
               type="submit"
               disabled={loggingIn}
               className="w-full py-3.5 rounded-xl text-xs sm:text-sm font-black tracking-[2px] transition-all duration-300 hover:brightness-110 active:scale-95 shadow-lg disabled:opacity-50 mt-1 border-2 border-black"
-              style={{ backgroundColor: themePrimaryColor, color: '#000000' }}
+              style={{ backgroundColor: themePrimaryColor, color: '#ffffff' }}
             >
               {loggingIn ? (
                 <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -1802,7 +1802,7 @@ const SellPage = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8 pb-10">
+      <form onSubmit={handleSubmit} className="space-y-8 pb-32">
         {/* Images Selection */}
         <div className="bg-white p-6 md:p-8 rounded-3xl border border-border-main shadow-sm space-y-4">
           <label className="block text-xs font-black text-text-muted uppercase tracking-widest ml-1">Product Images</label>
@@ -2045,8 +2045,8 @@ const SellPage = () => {
   const images = listing.images.length > 0 ? listing.images : [`https://picsum.photos/seed/${listing.id}/800/800`];
 
   return (
-    <div className="flex-1 px-4 py-8 md:px-8 overflow-y-auto no-scrollbar bg-white min-h-screen">
-       <div className="max-w-5xl mx-auto space-y-8 pb-20">
+    <div className="flex-1 px-4 py-8 md:px-8 overflow-y-auto no-scrollbar bg-white">
+       <div className="max-w-5xl mx-auto space-y-8 pb-32">
         <header className="flex items-center justify-between">
             <button onClick={() => navigate(-1)} className="group p-2 flex items-center gap-2 text-sm font-black text-text-muted hover:text-brand-primary transition-colors uppercase tracking-widest">
                 <div className="w-8 h-8 rounded-full bg-bg-light border border-border-main flex items-center justify-center group-hover:bg-accent-subtle group-hover:border-brand-primary transition-all">
@@ -2071,6 +2071,15 @@ const SellPage = () => {
                 </button>
             </div>
         </header>
+
+        {/* Mobile Title & Price Block - Visible on mobile only */}
+        <div className="block lg:hidden space-y-2 mb-4 bg-white p-4 rounded-3xl border border-border-main shadow-sm">
+            <h1 className="text-3xl font-black text-text-main tracking-tight leading-tight">{listing.title}</h1>
+            <div className="flex items-end gap-3">
+                <span className="text-3xl font-black text-brand-primary">₱{listing.price.toLocaleString()}</span>
+                <span className="text-text-muted text-xs font-bold mb-1 uppercase tracking-wider">Fixed Price</span>
+            </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
             {/* Visuals - 7/12 cols */}
@@ -2117,11 +2126,69 @@ const SellPage = () => {
                         ))}
                     </div>
                 )}
+
+                {/* Primary Action Buttons - Strategically placed under the visual asset to balance layout, solve empty space gaps, and ensure rapid visibility on responsive devices */}
+                <div className="pt-2 z-10 relative">
+                    {user?.id !== listing.sellerId ? (
+                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                            <button 
+                                onClick={handleMessage}
+                                className="w-full py-4 bg-white border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 cursor-pointer"
+                            >
+                                <MessageSquare size={18} className="flex-shrink-0" /> Chat First
+                            </button>
+                            <button 
+                                onClick={handleBuy}
+                                disabled={buying || listing.status === 'sold'}
+                                className="w-full py-4 bg-brand-primary text-white hover:bg-brand-primary-hover rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-brand-primary/20 hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 disabled:opacity-50 cursor-pointer"
+                            >
+                                {buying ? (
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                    <ShoppingBag size={18} className="flex-shrink-0" />
+                                )}
+                                <span className="truncate">{listing.status === 'sold' ? 'Sold Out' : 'Buy Now'}</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-3xl flex items-start gap-4">
+                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-amber-500 shadow-sm flex-shrink-0">
+                                    <AlertCircle size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-[11px] text-amber-800 font-extrabold uppercase tracking-widest mb-0.5">Seller Dashboard</p>
+                                    <p className="text-xs text-amber-700 font-medium opacity-80 leading-snug">This is your listing. Keep track of views and status here.</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button 
+                                    onClick={() => {
+                                        if (window.confirm('Are you sure you want to delete this listing?')) {
+                                            deleteListing(listing.id);
+                                            navigate('/market');
+                                        }
+                                    }}
+                                    className="py-4 border border-red-200 text-red-500 hover:bg-red-50 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+                                >
+                                    <Trash2 size={16} /> Delete
+                                </button>
+                                <button 
+                                    onClick={() => markAsSold(listing.id)}
+                                    disabled={listing.status === 'sold'}
+                                    className="py-4 bg-brand-primary text-white hover:bg-brand-primary-hover rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-brand-primary/20 disabled:opacity-50 transition-all cursor-pointer"
+                                >
+                                    <CheckCircle size={16} /> {listing.status === 'sold' ? 'Sold Out' : 'Mark Sold'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Info - 5/12 cols */}
             <div className="lg:col-span-5 flex flex-col pt-2">
-                <div className="mb-8">
+                <div className="mb-8 hidden lg:block">
                     <h1 className="text-4xl font-black text-text-main tracking-tight leading-tight mb-4">{listing.title}</h1>
                     <div className="flex items-end gap-3">
                         <span className="text-4xl font-black text-brand-primary">₱{listing.price.toLocaleString()}</span>
@@ -2184,63 +2251,6 @@ const SellPage = () => {
                                     #{tag}
                                 </span>
                             ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="mt-auto pt-10">
-                    {user?.id !== listing.sellerId ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <button 
-                                onClick={handleMessage}
-                                className="w-full py-5 bg-white border-2 border-brand-primary text-brand-primary rounded-[24px] font-black text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-sm hover:bg-bg-light active:scale-[0.98] transition-all"
-                            >
-                                <MessageSquare size={20} /> Chat First
-                            </button>
-                            <button 
-                                onClick={handleBuy}
-                                disabled={buying || listing.status === 'sold'}
-                                className="w-full py-5 bg-brand-primary text-white rounded-[24px] font-black text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl shadow-brand-primary/25 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
-                            >
-                                {buying ? (
-                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                    <ShoppingBag size={20} />
-                                )}
-                                {listing.status === 'sold' ? 'Sold Out' : 'Buy Now'}
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-3xl flex items-start gap-4">
-                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-amber-500 shadow-sm flex-shrink-0">
-                                    <AlertCircle size={20} />
-                                </div>
-                                <div>
-                                    <p className="text-[11px] text-amber-800 font-extrabold uppercase tracking-widest mb-0.5">Seller Dashboard</p>
-                                    <p className="text-xs text-amber-700 font-medium opacity-80 leading-snug">This is your listing. Keep track of views and status here.</p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <button 
-                                    onClick={() => {
-                                        if (window.confirm('Are you sure you want to delete this listing?')) {
-                                            deleteListing(listing.id);
-                                            navigate('/market');
-                                        }
-                                    }}
-                                    className="py-4 border border-red-200 text-red-500 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-50 transition-all shadow-sm"
-                                >
-                                    <Trash2 size={16} /> Delete
-                                </button>
-                                <button 
-                                    onClick={() => markAsSold(listing.id)}
-                                    disabled={listing.status === 'sold'}
-                                    className="py-4 bg-brand-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-brand-primary/20 hover:bg-brand-primary-hover disabled:opacity-50 transition-all"
-                                >
-                                    <CheckCircle size={16} /> {listing.status === 'sold' ? 'Sold Out' : 'Mark Sold'}
-                                </button>
-                            </div>
                         </div>
                     )}
                 </div>
@@ -3448,8 +3458,8 @@ const EditProfilePage = () => {
     if (!user) return null;
 
     return (
-        <div className="flex-1 px-6 py-10 overflow-y-auto no-scrollbar bg-white min-h-screen">
-            <div className="max-w-2xl mx-auto space-y-8">
+        <div className="flex-1 px-6 py-10 overflow-y-auto no-scrollbar bg-white">
+            <div className="max-w-2xl mx-auto space-y-8 pb-32">
                 <div className="flex items-center gap-4">
                     <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-text-muted hover:text-brand-primary transition-colors">
                         <ArrowLeft size={24} />
@@ -3541,7 +3551,7 @@ const MessagesListPage = () => {
     if (!user) return null;
 
     return (
-        <div className="flex-1 px-6 py-6 overflow-y-auto no-scrollbar">
+        <div className="flex-1 px-6 pt-6 pb-28 sm:pb-6 overflow-y-auto no-scrollbar">
             <h1 className="text-2xl font-bold text-text-main mb-6">Messages</h1>
             <div className="space-y-3">
                 {chats.length === 0 ? (
@@ -3616,7 +3626,7 @@ const TransactionsPage = () => {
 
     return (
         <div className="flex-1 px-4 py-8 overflow-y-auto no-scrollbar bg-[#f8fafc]">
-            <div className="max-w-3xl mx-auto space-y-6 pb-20">
+            <div className="max-w-3xl mx-auto space-y-6 pb-32">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl font-black text-text-main">Transaction History</h1>

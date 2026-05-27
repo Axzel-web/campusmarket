@@ -233,7 +233,7 @@ export const SpotlightTutorial: React.FC<SpotlightTutorialProps> = ({
                   )}
                   <button 
                     onClick={handleNext}
-                    className="flex items-center gap-2 px-6 h-11 bg-brand-primary text-brand-deep rounded-2xl text-xs font-black shadow-xl shadow-brand-primary/30 hover:scale-[1.05] active:scale-95 transition-all uppercase tracking-wider"
+                    className="flex items-center gap-2 px-6 h-11 bg-brand-primary text-white rounded-2xl text-xs font-black shadow-xl shadow-brand-primary/30 hover:scale-[1.05] active:scale-95 transition-all uppercase tracking-wider"
                   >
                     {currentStepIndex === steps.length - 1 ? 'Got it!' : 'Next'}
                     <ChevronRight size={16} />

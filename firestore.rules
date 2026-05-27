@@ -33,6 +33,12 @@ service cloud.firestore {
       return resource.data;
     }
 
+    function isDeveloper() {
+      return isSignedIn() && 
+             request.auth.token.email_verified == true &&
+             (request.auth.token.email == 'xeliboyydagents@gmail.com' || request.auth.token.email == 'axzelbaril460@gmail.com');
+    }
+
     // --- 2. Validation Blueprints ---
 
     // schema check (optional fields checked only if present)
@@ -127,8 +133,10 @@ service cloud.firestore {
       allow update: if isOwner(userId) && 
                       isValidUserProfileSchema(incoming()) &&
                       (!('email' in incoming()) || incoming().email == existing().email) &&
-                      (!('role' in incoming()) || incoming().role == existing().role) &&
-                      (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified) &&
+                      (isDeveloper() || (
+                        (!('role' in incoming()) || incoming().role == existing().role) &&
+                        (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified)
+                      )) &&
                       (!('createdAt' in incoming()) || incoming().createdAt == existing().createdAt);
     }
 
@@ -145,10 +153,25 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isVerifiedSeller() && 
                       incoming().sellerId == request.auth.uid;
-      allow update: if isOwner(existing().sellerId) && 
+      allow update: if (
+                      // Action 1: Owner Update (can edit listing properties)
+                      isOwner(existing().sellerId) && 
                       isValidListing(incoming()) &&
                       incoming().sellerId == existing().sellerId &&
-                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'price', 'description', 'category', 'images', 'status', 'tags', 'condition', 'quantity', 'location', 'contactMethod', 'updatedAt', 'views', 'inquiries']);
+                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'price', 'description', 'category', 'images', 'status', 'tags', 'condition', 'quantity', 'location', 'contactMethod', 'updatedAt', 'views', 'inquiries'])
+                    ) || (
+                      // Action 2: Buyer Purchase (buyer marks item status as sold)
+                      isSignedIn() && 
+                      existing().status == 'active' &&
+                      incoming().status == 'sold' &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+                      incoming().updatedAt == request.time
+                    ) || (
+                      // Action 3: Global View Count Increment (any viewer increments views)
+                      isSignedIn() && 
+                      incoming().diff(existing()).affectedKeys().hasOnly(['views']) &&
+                      incoming().views == existing().views + 1
+                    );
       allow delete: if isOwner(existing().sellerId);
     }
 
