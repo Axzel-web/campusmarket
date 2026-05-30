@@ -59,7 +59,7 @@ import { SecuritySettingsPage } from './components/SecuritySettingsPage';
 import { supabase } from './lib/supabase';
 import { uploadProductImage } from './services/productService';
 import { SpotlightTutorial } from './components/SpotlightTutorial';
-const campusMarketLogo = "https://lh3.googleusercontent.com/d/16htYcEv8qLoKkMIbqIOmEF7xGjVh-GVM";
+const campusMarketLogo = "https://lh3.googleusercontent.com/d/13tC-_YnLvpr47f5FK7LFeasDSQgUduvx";
 import campusBuildingSketch from './assets/images/campus_building_sket_1780133932997.png';
 
 import { 

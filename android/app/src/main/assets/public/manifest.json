@@ -1,0 +1,38 @@
+{
+  "name": "CampusMarket",
+  "short_name": "CampusMarket",
+  "description": "A modern student marketplace for buying and selling items within the campus.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0B3D2E",
+  "theme_color": "#0B3D2E",
+  "categories": ["shopping", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "https://lh3.googleusercontent.com/d/13tC-_YnLvpr47f5FK7LFeasDSQgUduvx",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://lh3.googleusercontent.com/d/13tC-_YnLvpr47f5FK7LFeasDSQgUduvx",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://lh3.googleusercontent.com/d/13tC-_YnLvpr47f5FK7LFeasDSQgUduvx",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "https://lh3.googleusercontent.com/d/13tC-%5FYnLvpr47f5FK7LFeasDSQgUduvx",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
