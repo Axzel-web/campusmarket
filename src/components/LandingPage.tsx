@@ -73,7 +73,7 @@ export default function LandingPage() {
       {/* Top nav */}
       <header className="fixed top-0 left-0 right-0 z-50 px-4 md:px-0">
         <nav className="glass mx-auto mt-4 mb-2 flex max-w-5xl items-center justify-between rounded-full px-4 md:px-6 py-2 md:py-3">
-          <span className="text-sm font-semibold tracking-tight text-white">CampusMart <span className="text-[10px] opacity-60 ml-1 font-normal">PLSP</span></span>
+          <span className="text-sm font-semibold tracking-tight text-white">CampusMart</span>
           <div className="hidden gap-8 md:flex">
             <a href="#browse" className="text-sm text-white/70 transition hover:text-white">Shop</a>
             <a href="#sell" className="text-sm text-white/70 transition hover:text-white">Sell</a>

@@ -36,7 +36,13 @@ import {
   Share2,
   Copy,
   ExternalLink,
-  Check
+  Check,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  LogIn,
+  GraduationCap
 } from 'lucide-react';
 import { SpiderCursor } from "./components/ui/spider-cursor";
 import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication, Transaction } from './types';
@@ -53,6 +59,8 @@ import { SecuritySettingsPage } from './components/SecuritySettingsPage';
 import { supabase } from './lib/supabase';
 import { uploadProductImage } from './services/productService';
 import { SpotlightTutorial } from './components/SpotlightTutorial';
+const campusMarketLogo = "https://lh3.googleusercontent.com/d/16htYcEv8qLoKkMIbqIOmEF7xGjVh-GVM";
+import campusBuildingSketch from './assets/images/campus_building_sket_1780133932997.png';
 
 import { 
   onAuthStateChanged, 
@@ -923,6 +931,7 @@ const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   if (user) return <Navigate to="/market" replace />;
 
@@ -946,146 +955,278 @@ const LoginPage = () => {
 
   const handleGoogleLogin = async () => {
     setLoggingIn(true);
+    setError('');
     try {
       await login();
+    } catch (err: any) {
+      if (err && err.code !== 'auth/popup-closed-by-user') {
+        setError(err.message || 'Google Sign-In failed');
+      }
     } finally {
       setLoggingIn(false);
     }
   };
 
-  const themeBackground = "#f3f4f6";
-  const themePrimaryColor = "#166534";
-  const themeColor = "#000000";
-  const isDarkTheme = false;
-
   return (
-    <div 
-      className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 relative overflow-hidden transition-colors duration-500 font-sans"
-      style={{ backgroundColor: themeBackground, color: themeColor }}
-    >
-      <div className="relative w-full max-w-[420px] z-10 py-8">
-        <motion.div 
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className="relative backdrop-blur-2xl border rounded-[2rem] p-5 sm:p-7 md:p-8 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] overflow-hidden"
-          style={{ 
-            backgroundColor: 'rgba(0, 0, 0, 0.05)',
-            borderColor: 'rgba(0, 0, 0, 0.1)'
-          }}
-        >
-          {/* Header Section - More Compact */}
-          <div className="flex flex-col items-center mb-4 sm:mb-6">
-            <Link to="/" className="absolute top-4 left-4 p-2 bg-black/5 rounded-full hover:bg-black/10 transition-all text-black">
-              <ArrowLeft size={18} />
-            </Link>
-            <div className="w-full max-w-[120px] sm:max-w-[150px] mb-3">
-              <img 
-                src="https://raw.githubusercontent.com/hicodersofficial/glassmorphism-login-form/master/assets/illustration.png" 
-                alt="CampusMart" 
-                className="w-full h-auto drop-shadow-xl animate-float"
-              />
-            </div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-center tracking-[0.15em] uppercase leading-none" style={{ color: themeColor }}>
-              {mode === 'signup' ? 'Sign Up' : 'Sign In'}
-            </h1>
+    <div className="min-h-screen w-full bg-slate-50 md:bg-[#08231a] relative flex items-center justify-center p-0 md:p-8 font-sans overflow-y-auto select-none">
+      {/* Visual background decorations in screenshot style - light slates on mobile, emerald on desktop */}
+      <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1.5px,transparent_1.5px)] md:bg-[radial-gradient(#14532d_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-50 md:opacity-40"></div>
+      
+      {/* Ambient gradient glows (desktop only to prevent spillage on pristine light mobile view) */}
+      <div className="hidden md:block absolute top-1/4 -right-20 w-[400px] h-[400px] bg-emerald-700/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="hidden md:block absolute bottom-1/4 -left-20 w-[400px] h-[400px] bg-emerald-900/20 rounded-full blur-[120px] pointer-events-none"></div>
+
+      {/* Outer green dots design in reference image corners */}
+      <div className="absolute top-10 right-10 opacity-20 hidden lg:grid grid-cols-5 gap-2">
+        {Array.from({ length: 25 }).map((_, i) => (
+          <div key={i} className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
+        ))}
+      </div>
+      <div className="absolute bottom-10 left-10 opacity-20 hidden lg:grid grid-cols-5 gap-2">
+        {Array.from({ length: 25 }).map((_, i) => (
+          <div key={i} className="w-1.5 h-1.5 bg-[#4ade80] rounded-full"></div>
+        ))}
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: "easeOut" }}
+        className="relative w-full md:max-w-[1024px] min-h-screen md:min-h-[640px] md:h-auto bg-white md:bg-[#0E3D2F]/10 md:backdrop-blur-md md:rounded-3xl md:border md:border-white/[0.08] md:shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col md:flex-row overflow-hidden z-10"
+      >
+        {/* Left Hand Side: Banner display and branding (Visible on desktop only) */}
+        <div className="hidden md:flex md:w-[45%] bg-white flex-col justify-between p-8 relative overflow-hidden select-none border-r border-[#14532D]/10">
+          <Link 
+            to="/" 
+            className="absolute top-6 left-6 p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full transition-all flex items-center justify-center z-20"
+          >
+            <ArrowLeft size={18} />
+          </Link>
+
+          {/* Top-right subtle grid of dots */}
+          <div className="absolute top-6 right-6 opacity-30 grid grid-cols-3 gap-1">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="w-1 h-1 bg-emerald-800 rounded-full"></div>
+            ))}
           </div>
 
-          <form onSubmit={handleEmailAuth} className="space-y-3 sm:space-y-4">
-            <button 
-              type="button"
-              onClick={handleGoogleLogin}
-              disabled={loggingIn}
-              className="w-full py-3.5 rounded-xl border-2 flex items-center justify-center gap-3 hover:brightness-95 transition-all text-xs font-black tracking-[2px] disabled:opacity-50 uppercase mb-4 shadow-lg"
-              style={{ 
-                backgroundColor: '#FFFFFF',
-                color: '#000000',
-                borderColor: '#000000'
-              }}
+          <div className="my-auto flex flex-col items-center justify-center py-10 z-10">
+            <motion.div 
+              initial={{ scale: 0.94, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="w-full max-w-[280px] lg:max-w-[320px] flex items-center justify-center"
             >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-              Sign in with Google
-            </button>
-
-            <div className="relative flex items-center my-4">
-              <div className="flex-grow border-t border-current opacity-10"></div>
-              <span className="flex-shrink px-3 text-[8px] font-black opacity-30 uppercase tracking-[2px]">OR EMAIL</span>
-              <div className="flex-grow border-t border-current opacity-10"></div>
-            </div>
-
-            <div className="group">
-              <input 
-                type="email" 
-                required
-                placeholder="UNIVERSITY EMAIL"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full py-3 sm:py-3.5 px-4 rounded-xl outline-none text-[11px] sm:text-xs font-bold tracking-widest placeholder:text-black placeholder:opacity-50 backdrop-blur-md transition-all border shadow-sm focus:border-black focus:bg-white/40"
-                style={{ 
-                  color: themeColor,
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  borderColor: 'rgba(0, 0, 0, 0.1)'
-                }}
+              <img 
+                src={campusMarketLogo} 
+                alt="Campus Market Logo" 
+                referrerPolicy="no-referrer"
+                className="w-full h-auto object-contain drop-shadow-[0_12px_24px_rgba(20,83,45,0.15)] hover:scale-105 transition-transform duration-500"
               />
-            </div>
-            <div className="group">
-              <input 
-                type="password" 
-                required
-                placeholder="PASSWORD"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full py-3 sm:py-3.5 px-4 rounded-xl outline-none text-[11px] sm:text-xs font-bold tracking-widest placeholder:text-black placeholder:opacity-50 backdrop-blur-md transition-all border shadow-sm focus:border-black focus:bg-white/40"
-                style={{ 
-                  color: themeColor,
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  borderColor: 'rgba(0, 0, 0, 0.1)'
-                }}
-              />
+            </motion.div>
+          </div>
+
+          {/* Building Sketch bottom accent */}
+          <div className="absolute bottom-0 left-0 right-0 w-full opacity-[0.12] pointer-events-none select-none">
+            <img 
+              src={campusBuildingSketch} 
+              alt="Campus landmark drawing" 
+              className="w-full h-auto object-cover object-bottom"
+            />
+          </div>
+        </div>
+
+        {/* Right Hand Side: Interactive input form. Adapts fully to white on mobile, deep green on desktop */}
+        <div className="w-full md:w-[55%] bg-white md:bg-gradient-to-br md:from-[#0B3D2E] md:via-[#0d4f3b] md:to-[#14532D] flex flex-col justify-between p-6 sm:p-10 md:p-12 relative overflow-y-auto select-none">
+          {/* Mobile Back Button removed for direct-login mobile experience */}
+
+          {/* Mobile Logo Block - Visible at top on mobile only to match the phone mockup layout */}
+          <div className="flex md:hidden flex-col items-center justify-center mt-4 mb-4">
+            <img 
+              src={campusMarketLogo} 
+              alt="Campus Market Logo" 
+              referrerPolicy="no-referrer"
+              className="w-56 sm:w-64 h-auto object-contain drop-shadow-[0_4px_12px_rgba(20,83,45,0.08)]"
+            />
+          </div>
+
+          <div className="w-full max-w-[380px] mx-auto my-auto py-2 z-10">
+            <div className="text-center mb-5 sm:mb-6">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-800 md:text-white tracking-tight">
+                {mode === 'login' ? 'Welcome Back!' : 'Join Campus Market'}
+              </h2>
+              <div className="w-16 h-1 bg-emerald-600 md:bg-[#4ade80] mx-auto my-2 rounded-full"></div>
+              <p className="text-xs text-slate-500 md:text-white/70 leading-relaxed font-medium">
+                {mode === 'login' 
+                  ? 'Login to your Campus Market account and start buying, selling and connecting.' 
+                  : 'Register nested inside university domain and explore endless student listings.'}
+              </p>
             </div>
 
-            {error && (
-              <motion.p 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="text-[9px] font-black text-center uppercase tracking-wider" 
-                style={{ color: '#C62828' }}
-              >
-                {error}
-              </motion.p>
-            )}
+            <form onSubmit={handleEmailAuth} className="space-y-4">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700 md:text-white/85 uppercase tracking-widest ml-1">Email Address</label>
+                <div className="relative flex items-center group">
+                  <Mail className="absolute left-4 text-slate-400 md:text-white/40 group-focus-within:text-emerald-600 md:group-focus-within:text-[#4ade80] transition-colors" size={18} />
+                  <input 
+                    type="email"
+                    required
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 md:bg-[#0B2E24]/40 hover:bg-slate-100/50 md:hover:bg-[#0B2E24]/60 focus:bg-white md:focus:bg-[#061F17] focus:ring-1 focus:ring-emerald-500 border border-slate-200 md:border-white/10 focus:border-emerald-500 md:focus:border-[#4ade80] outline-none text-sm text-slate-900 md:text-white rounded-2xl placeholder:text-slate-400 md:placeholder:text-white/30 transition-all font-medium"
+                  />
+                </div>
+              </div>
 
-            <button 
-              type="submit"
-              disabled={loggingIn}
-              className="w-full py-3.5 rounded-xl text-xs sm:text-sm font-black tracking-[2px] transition-all duration-300 hover:brightness-110 active:scale-95 shadow-lg disabled:opacity-50 mt-1 border-2 border-black"
-              style={{ backgroundColor: themePrimaryColor, color: '#ffffff' }}
-            >
-              {loggingIn ? (
-                <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto"></div>
-              ) : (
-                mode === 'signup' ? 'REGISTER' : 'ENTER'
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700 md:text-white/85 uppercase tracking-widest ml-1">Password</label>
+                <div className="relative flex items-center group">
+                  <Lock className="absolute left-4 text-slate-400 md:text-white/40 group-focus-within:text-emerald-600 md:group-focus-within:text-[#4ade80] transition-colors" size={18} />
+                  <input 
+                    type={showPassword ? "text" : "password"}
+                    required
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-11 pr-11 py-3 bg-slate-50 md:bg-[#0B2E24]/40 hover:bg-slate-100/50 md:hover:bg-[#0B2E24]/60 focus:bg-white md:focus:bg-[#061F17] focus:ring-1 focus:ring-emerald-500 border border-slate-200 md:border-white/10 focus:border-emerald-500 md:focus:border-[#4ade80] outline-none text-sm text-slate-900 md:text-white rounded-2xl placeholder:text-slate-400 md:placeholder:text-white/30 transition-all font-medium"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 text-slate-400 md:text-white/40 hover:text-slate-800 md:hover:text-white transition-colors cursor-pointer animate-none flex items-center justify-center"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Forgot Password Line */}
+              <div className="flex justify-end pt-0.5">
+                <button 
+                  type="button"
+                  onClick={() => setError("A password reset link will be sent to your registered academic email address.")}
+                  className="text-xs font-semibold text-emerald-600 md:text-[#4ade80] hover:text-emerald-700 md:hover:text-[#58ec94] transition-all hover:underline cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+
+              {error && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="p-3 bg-red-50 md:bg-red-500/10 border border-red-200 md:border-red-500/20 text-red-600 md:text-red-200 text-xs font-semibold rounded-xl text-center"
+                >
+                  {error}
+                </motion.div>
               )}
-            </button>
-          </form>
 
-          <footer className="mt-4 flex flex-col items-center">
-            <div className="flex justify-between w-full text-[8px] sm:text-[9px] font-bold tracking-widest px-1" style={{ color: themeColor, opacity: 0.7 }}>
+              {/* Login/Signup Submission */}
               <button 
-                onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-                className="hover:opacity-100 transition-opacity uppercase underline underline-offset-4"
+                type="submit"
+                disabled={loggingIn}
+                className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-green-750 hover:from-emerald-400 hover:to-emerald-600 text-white font-extrabold text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2.5 transition-all duration-300 shadow-lg shadow-emerald-550/10 md:shadow-emerald-950/40 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer mt-4"
               >
-                {mode === 'login' ? 'Create Account' : 'Back to Login'}
+                {loggingIn ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    <LogIn size={16} />
+                    <span>{mode === 'signup' ? 'Sign Up' : 'Login'}</span>
+                  </>
+                )}
               </button>
-              <button className="hover:opacity-100 transition-opacity uppercase font-sans">Forgot?</button>
-            </div>
-          </footer>
-        </motion.div>
-      </div>
+            </form>
 
-      <div className="fixed top-8 left-8 sm:left-auto sm:right-10 text-[9px] font-black tracking-[4px] opacity-30 uppercase">
-        <span className="hidden sm:inline">Plsp University • Marketplace • </span> 2026 
-      </div>
+            <div className="relative flex items-center my-5 sm:my-6">
+              <div className="flex-grow border-t border-slate-200 md:border-white/10"></div>
+              <span className="flex-shrink px-3 text-[10px] font-bold text-slate-400 md:text-white/30 uppercase tracking-widest">or continue with</span>
+              <div className="flex-grow border-t border-slate-200 md:border-white/10"></div>
+            </div>
+
+            {/* Google, FB, Apple Row */}
+            <div className="flex gap-3">
+              <button 
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loggingIn}
+                className="flex-1 py-3 bg-white hover:bg-slate-50 md:bg-white/5 md:hover:bg-white/11 border border-slate-200 md:border-white/10 hover:border-slate-300 md:hover:border-white/20 rounded-2xl flex items-center justify-center transition-all cursor-pointer disabled:opacity-50 shadow-sm md:shadow-none"
+                title="Sign in with Google"
+              >
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+              </button>
+              <button 
+                type="button"
+                onClick={() => setError("Facebook authentication will be supported in future versions. Use Google or your email.")}
+                className="flex-1 py-3 bg-white hover:bg-slate-50 md:bg-white/5 md:hover:bg-white/11 border border-slate-200 md:border-white/10 hover:border-slate-300 md:hover:border-white/20 rounded-2xl flex items-center justify-center transition-all cursor-pointer shadow-sm md:shadow-none"
+                title="Sign in with Facebook"
+              >
+                <svg className="w-5 h-5 text-[#1877F2] fill-current" viewBox="0 0 24 24">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
+              </button>
+              <button 
+                type="button"
+                onClick={() => setError("Apple OAuth will be supported in future versions. Use Google or your email.")}
+                className="flex-1 py-3 bg-white hover:bg-slate-50 md:bg-white/5 md:hover:bg-white/11 border border-slate-200 md:border-white/10 hover:border-slate-300 md:hover:border-white/20 rounded-2xl flex items-center justify-center transition-all cursor-pointer shadow-sm md:shadow-none"
+                title="Sign in with Apple"
+              >
+                <svg className="w-5 h-5 text-slate-800 md:text-white fill-current" viewBox="0 0 24 24">
+                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.22.67-2.94 1.5-.64.74-1.2 1.88-1.05 3 .11.1 1.24.04 2.15-.42z"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Alternating mode link */}
+            <div className="text-center text-xs text-slate-500 md:text-white/60 font-medium mt-6 sm:mt-8">
+              {mode === 'login' ? (
+                <>
+                  Don't have an account?{' '}
+                  <button 
+                    type="button"
+                    onClick={() => { setMode('signup'); setError(''); }}
+                    className="text-emerald-600 md:text-[#4ade80] hover:text-emerald-700 md:hover:text-[#58ec94] font-black tracking-wide uppercase ml-1 focus:outline-none transition-colors cursor-pointer"
+                  >
+                    Sign Up
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{' '}
+                  <button 
+                    type="button"
+                    onClick={() => { setMode('login'); setError(''); }}
+                    className="text-emerald-600 md:text-[#4ade80] hover:text-emerald-700 md:hover:text-[#58ec94] font-black tracking-wide uppercase ml-1 focus:outline-none transition-colors cursor-pointer"
+                  >
+                    Sign In
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Core Footer section "Safe • Secure • Trusted" */}
+          <div className="mt-6 pt-4 border-t border-slate-150 md:border-white/5 flex items-center justify-center gap-3 z-10">
+            <div className="w-8 h-8 rounded-full bg-emerald-50 md:bg-emerald-500/10 flex items-center justify-center text-emerald-600 md:text-[#4ade80] border border-emerald-100 md:border-emerald-500/20">
+              <ShieldCheck size={18} />
+            </div>
+            <div className="text-left">
+              <p className="text-[10px] font-black text-slate-800 md:text-white uppercase tracking-wider leading-none mb-0.5">Safe • Secure • Trusted</p>
+              <p className="text-[9px] text-slate-400 md:text-white/50 font-medium">Your campus marketplace</p>
+            </div>
+          </div>
+
+          {/* Mobile Building sketch watermark */}
+          <div className="absolute bottom-0 left-0 right-0 w-full opacity-[0.05] md:hidden pointer-events-none select-none z-0">
+            <img 
+              src={campusBuildingSketch} 
+              alt="Campus landmark drawing" 
+              className="w-full h-auto object-cover object-bottom"
+            />
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 };
@@ -2542,8 +2683,13 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Login Error:", error);
+    } catch (error: any) {
+      if (error && error.code === 'auth/popup-closed-by-user') {
+        console.warn("Google sign-in popup closed by user.");
+      } else {
+        console.error("Login Error:", error);
+      }
+      throw error;
     }
   };
 
@@ -3287,131 +3433,450 @@ const OnboardingPage = () => {
     } as React.CSSProperties;
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 md:p-6 font-hind relative overflow-hidden" style={slideStyles}>
-            <div className="fixed inset-0 -z-10 bg-black overflow-hidden pointer-events-none">
-                <SpiderCursor />
-            </div>
+        <div className="min-h-screen w-full bg-[#08231a] relative flex items-center justify-center p-0 md:p-8 font-sans overflow-y-auto select-none">
+            {/* Visual background decorations in screenshot style - light slates on mobile, emerald on desktop */}
+            <div className="absolute inset-0 bg-[radial-gradient(#14532d_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-40"></div>
             
-            <motion.main 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="relative w-full max-w-[356px] bg-[#221F1E] rounded-[1.25rem] py-12 px-0 text-center overflow-hidden shadow-2xl"
+            {/* Ambient gradient glows */}
+            <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-emerald-700/10 rounded-full blur-[120px] pointer-events-none"></div>
+            <div className="absolute bottom-1/4 left-1/4 w-[500px] h-[500px] bg-emerald-950/20 rounded-full blur-[120px] pointer-events-none"></div>
+
+            {/* Design accents */}
+            <div className="absolute top-10 right-10 opacity-20 hidden lg:grid grid-cols-5 gap-2">
+                {Array.from({ length: 25 }).map((_, i) => (
+                    <div key={i} className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
+                ))}
+            </div>
+            <div className="absolute bottom-10 left-10 opacity-20 hidden lg:grid grid-cols-5 gap-2">
+                {Array.from({ length: 25 }).map((_, i) => (
+                    <div key={i} className="w-1.5 h-1.5 bg-[#4ade80] rounded-full"></div>
+                ))}
+            </div>
+
+            <motion.div 
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, ease: "easeOut" }}
+                className="relative w-full md:max-w-[1120px] min-h-screen md:min-h-[660px] md:h-auto bg-[#0E3D2F]/10 md:backdrop-blur-xl md:rounded-3xl md:border md:border-white/[0.08] md:shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col md:flex-row overflow-y-auto md:overflow-hidden z-10"
             >
-                {step > 1 && (
-                    <button 
-                        onClick={handleSkip}
-                        className="absolute top-6 right-6 text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#EF895F] transition-colors z-20"
-                    >
-                        Skip
-                    </button>
-                )}
-
-                <div 
-                    className="flex transition-all duration-500 ease-in-out"
-                    style={{ 
-                        width: '300%', 
-                        marginLeft: `-${(step - 1) * 100}%` 
-                    }}
-                >
-                    <article className="w-full px-8 flex flex-col items-center">
-                        <img src="https://c.top4top.io/p_2020eq9aa1.png" alt="illustration" className="w-[90%] mb-4" />
-                        <div className="space-y-4">
-                            <h2 className="text-[1.75rem] font-semibold text-white leading-tight">The Essentials.</h2>
-                            <p className="text-sm text-white/60 font-light px-2 leading-relaxed">Every profile is verified to keep our community safe.</p>
-                            
-                            <div className="space-y-3 pt-2 w-full text-left">
-                                <input 
-                                    type="text" 
-                                    value={formData.fullName}
-                                    onChange={e => setFormData({ ...formData, fullName: e.target.value })}
-                                    className="w-full h-11 px-4 rounded-xl bg-white/10 border border-white/10 focus:border-[#EF895F] focus:ring-1 focus:ring-[#EF895F] outline-none transition-all text-white text-sm"
-                                    placeholder="Full Name"
-                                />
-                                <input 
-                                    type="text" 
-                                    value={formData.courseAndYear}
-                                    onChange={e => setFormData({ ...formData, courseAndYear: e.target.value })}
-                                    className="w-full h-11 px-4 rounded-xl bg-white/10 border border-white/10 focus:border-[#EF895F] focus:ring-1 focus:ring-[#EF895F] outline-none transition-all text-white text-sm"
-                                    placeholder="Course & Year"
-                                />
-                            </div>
-                        </div>
-                    </article>
-
-                    <article className="w-full px-8 flex flex-col items-center">
-                        <img src="https://e.top4top.io/p_2020mx8xt3.png" alt="illustration" className="w-[90%] mb-4" />
-                        <div className="space-y-4 w-full">
-                            <h2 className="text-[1.75rem] font-semibold text-white leading-tight">Your Story.</h2>
-                            <p className="text-sm text-white/60 font-light px-2 leading-relaxed">A great bio increases trust during meetups.</p>
-                            <textarea 
-                                value={formData.bio}
-                                onChange={e => setFormData({ ...formData, bio: e.target.value })}
-                                className="w-full h-32 p-4 rounded-xl bg-white/10 border border-white/10 focus:border-[#EF895F] focus:ring-1 focus:ring-[#EF895F] outline-none transition-all text-white text-sm resize-none"
-                                placeholder="Tell us about yourself..."
-                            />
-                        </div>
-                    </article>
-
-                    <article className="w-full px-8 flex flex-col items-center">
-                        <img src="https://d.top4top.io/p_20200jsuo2.png" alt="illustration" className="w-[90%] mb-4" />
-                        <div className="space-y-4 w-full">
-                            <h2 className="text-[1.75rem] font-semibold text-white leading-tight">Taste.</h2>
-                            <p className="text-sm text-white/60 font-light px-2 leading-relaxed">What are you looking for today?</p>
-                            
-                            <div className="grid grid-cols-2 gap-2 w-full pt-2">
-                                {interests.map(interest => (
-                                    <button
-                                        key={interest}
-                                        onClick={() => toggleInterest(interest)}
-                                        className={cn(
-                                            "h-10 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-all",
-                                            formData.interests.includes(interest)
-                                                ? "bg-[#EF895F] text-white border-[#EF895F]"
-                                                : "bg-white/5 text-white/60 border-white/10 hover:border-white/30"
-                                        )}
-                                    >
-                                        {interest}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </article>
-                </div>
-
-                <div className="px-8 mt-6">
-                    <button 
-                        onClick={step === 3 ? handleComplete : handleNext}
-                        disabled={step === 1 && (!formData.fullName || !formData.courseAndYear)}
-                        className={cn(
-                            "w-full h-12 bg-[#EF895F] text-white rounded-xl font-medium tracking-widest text-lg transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none shadow-sm",
-                            step === 3 && "shadow-[0_4px_20px_rgba(239,137,95,0.4)]"
-                        )}
-                    >
-                        {step === 3 ? 'Get Started' : 'Next'}
-                    </button>
-
-                    <div className="flex justify-center gap-1.5 mt-6">
-                        {[1, 2, 3].map(i => (
-                            <div 
-                                key={i}
-                                className={cn(
-                                    "h-1.5 rounded-full transition-all duration-500",
-                                    step === i ? "w-6 bg-white" : "w-2 bg-white/20"
-                                )}
-                            />
+                {/* Left Hand Side: Dynamic interactive step illustration and explicit core benefit lists (Desktop only) */}
+                <div className="hidden md:flex md:w-[48%] bg-white flex-col justify-between p-8 xl:p-10 relative overflow-hidden select-none border-r border-[#14532D]/10">
+                    <div className="absolute top-6 left-6 opacity-30 grid grid-cols-3 gap-1">
+                        {Array.from({ length: 9 }).map((_, i) => (
+                            <div key={i} className="w-1 h-1 bg-emerald-800 rounded-full"></div>
                         ))}
                     </div>
 
+                    {/* Logo and Mini Header */}
+                    <div className="flex items-center gap-2 z-10">
+                        <span className="w-8 h-8 rounded-lg bg-[#0b3d2e] text-[#4ade80] flex items-center justify-center font-black text-sm shadow-md">CM</span>
+                        <div>
+                            <span className="text-xs font-black tracking-widest text-[#0b3d2e] uppercase">CampusMart</span>
+                            <span className="text-[9px] bg-emerald-50 text-emerald-800 font-extrabold px-1.5 py-0.5 rounded ml-1.5 border border-emerald-100">VERIFIED</span>
+                        </div>
+                    </div>
+
+                    {/* Left Center Illustration Container */}
+                    <div className="my-auto flex flex-col items-center justify-center py-4 z-10 w-full">
+                        <AnimatePresence mode="wait">
+                            <motion.div 
+                                key={step}
+                                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                transition={{ duration: 0.35, ease: "easeOut" }}
+                                className="w-[80%] lg:w-[85%] flex items-center justify-center -mb-2"
+                            >
+                                <img 
+                                    src={
+                                        step === 1 
+                                            ? "https://c.top4top.io/p_2020eq9aa1.png" 
+                                            : step === 2 
+                                                ? "https://e.top4top.io/p_2020mx8xt3.png" 
+                                                : "https://d.top4top.io/p_20200jsuo2.png"
+                                    } 
+                                    alt={`Onboarding step ${step}`} 
+                                    className="w-full h-auto object-contain max-h-[260px] drop-shadow-[0_12px_24px_rgba(20,83,45,0.08)]"
+                                />
+                            </motion.div>
+                        </AnimatePresence>
+
+                        {/* Direct Core Benefits HUD (Step interactive highlight tracker) */}
+                        <div className="space-y-3 w-full mt-6 text-left">
+                            <div className="text-left mb-1.5">
+                                <h3 className="text-lg font-black text-slate-800 tracking-tight leading-tight">
+                                    Your University Marketplace
+                                </h3>
+                                <p className="text-slate-500 text-[11px] mt-0.5">
+                                    Erase the middleman. Secure trading exclusive to your university peer network.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-2">
+                                {[
+                                    {
+                                        title: "Buy & Sell Campus Items",
+                                        desc: "Find cheaper textbooks, course codes, uniforms, tech, or sell unused dorm supplies.",
+                                        icon: ShoppingBag,
+                                        stepNum: 1,
+                                    },
+                                    {
+                                        title: "Connect Instantly with Students",
+                                        desc: "In-app secure chats mean you don't trade personal phone numbers or social links.",
+                                        icon: MessageSquare,
+                                        stepNum: 2,
+                                    },
+                                    {
+                                        title: "Verified Student Marketplace",
+                                        desc: "Every profile belongs to registered campus members. Strict safety guidelines.",
+                                        icon: GraduationCap,
+                                        stepNum: 1,
+                                    },
+                                    {
+                                        title: "Safe and Secure Transactions",
+                                        desc: "Arrange handovers in physical safe zones right on academic grounds.",
+                                        icon: ShieldCheck,
+                                        stepNum: 3,
+                                    }
+                                ].map((benefit, idx) => {
+                                    const IconComponent = benefit.icon;
+                                    const isHighlighted = step === benefit.stepNum;
+                                    return (
+                                        <div 
+                                            key={idx} 
+                                            className={cn(
+                                                "p-3 rounded-2xl border transition-all duration-350 flex gap-3 text-left items-start",
+                                                isHighlighted 
+                                                    ? "bg-emerald-50/70 border-emerald-550/30 shadow-sm shadow-emerald-900/5 translate-x-1" 
+                                                    : "bg-slate-50/50 border-slate-200/40 opacity-70 hover:opacity-100"
+                                            )}
+                                        >
+                                            <div className={cn(
+                                                "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all",
+                                                isHighlighted ? "bg-[#0b3d2e] text-white shadow-sm" : "bg-white text-slate-500 border border-slate-200/50"
+                                            )}>
+                                                <IconComponent size={15} />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-slate-800 text-xs leading-tight flex items-center gap-1.5">
+                                                    <span>{benefit.title}</span>
+                                                    {isHighlighted && <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-ping" />}
+                                                </h4>
+                                                <p className="text-[9.5px] text-slate-500 mt-0.5 leading-relaxed font-semibold">{benefit.desc}</p>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Building Sketch bottom accent */}
+                    <div className="absolute bottom-0 left-0 right-0 w-full opacity-[0.05] pointer-events-none select-none">
+                        <img 
+                            src={campusBuildingSketch} 
+                            alt="Campus landmark drawing" 
+                            className="w-full h-auto object-cover object-bottom"
+                        />
+                    </div>
+                </div>
+
+                {/* Right Hand Side: Beautiful card-based interactive form container. Uses gorgeous consistent dark-green/white styling */}
+                <div className="w-full md:w-[52%] bg-gradient-to-br from-[#0B3D2E] via-[#0D4F3B] to-[#14532D] flex flex-col justify-center items-center p-4 sm:p-8 md:p-10 relative select-none">
+                    
+                    {/* Floating top Skip option */}
                     {step > 1 && (
                         <button 
-                            onClick={handleBack}
-                            className="mt-6 text-[10px] text-white/40 uppercase tracking-widest font-bold hover:text-white transition-colors"
+                            type="button"
+                            onClick={handleSkip}
+                            className="absolute top-6 right-6 text-[10px] uppercase tracking-widest font-extrabold text-[#4ade80] hover:text-[#58ec94] transition-colors z-20 cursor-pointer flex items-center gap-1 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10"
                         >
-                            Go Back
+                            <span>Skip For Now</span>
+                            <ChevronRight size={12} />
                         </button>
                     )}
+
+                    {/* Main White Card of the onboarding page */}
+                    <div className="w-full max-w-[440px] bg-white rounded-3xl shadow-[0_24px_60px_rgba(8,30,22,0.45)] border border-slate-100 p-5 sm:p-8 flex flex-col justify-between relative z-10 min-h-[480px]">
+                        
+                        {/* Improved Interactive Progress Timeline Tracker */}
+                        <div className="flex items-center justify-between w-full mb-6 relative px-3">
+                            <div className="absolute top-[15px] left-0 right-0 h-0.5 bg-slate-100 -translate-y-1/2 z-0"></div>
+                            <div 
+                                className="absolute top-[15px] left-0 h-0.5 bg-emerald-500 -translate-y-1/2 transition-all duration-300 z-0"
+                                style={{ width: step === 1 ? '15%' : step === 2 ? '50%' : '85%' }}
+                            ></div>
+                            
+                            {[
+                                { num: 1, label: 'Identity', desc: 'Required' },
+                                { num: 2, label: 'Story', desc: 'Optional' },
+                                { num: 3, label: 'Taste', desc: 'Feed setup' }
+                            ].map((s) => {
+                                const isActive = step === s.num;
+                                const isCompleted = step > s.num;
+                                return (
+                                    <div key={s.num} className="flex flex-col items-center z-10">
+                                        <div className={cn(
+                                            "w-7.5 h-7.5 rounded-full flex items-center justify-center font-bold text-xxs transition-all duration-300",
+                                            isCompleted 
+                                                ? "bg-emerald-600 text-white shadow-sm" 
+                                                : isActive 
+                                                    ? "bg-[#0b3d2e] text-[#4ade80] ring-4 ring-[#0b3d2e]/10 shadow-md scale-105" 
+                                                    : "bg-white border-2 border-slate-200 text-slate-400"
+                                        )}>
+                                            {isCompleted ? <Check size={12} className="stroke-[3.5]" /> : s.num}
+                                        </div>
+                                        <span className={cn(
+                                            "text-[9px] uppercase tracking-wider font-black mt-2 leading-none",
+                                            isActive ? "text-[#0b3d2e]" : isCompleted ? "text-emerald-600" : "text-slate-400"
+                                        )}>
+                                            {s.label}
+                                        </span>
+                                        <span className="text-[7.5px] text-slate-400 font-extrabold mt-0.5">{s.desc}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Interactive Steps slide views */}
+                        <div className="overflow-hidden flex-1 flex flex-col justify-center">
+                            <div 
+                                className="flex transition-all duration-500 ease-in-out"
+                                style={{ 
+                                    width: '300%', 
+                                    marginLeft: `-${(step - 1) * 100}%` 
+                                }}
+                            >
+                                {/* Slide 1: Essentials Form */}
+                                <div className="w-1/3 flex-shrink-0 px-1 flex flex-col justify-center text-left">
+                                    <div className="mb-4">
+                                        <span className="text-[9px] uppercase tracking-widest font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100">STEP 1 OF 3</span>
+                                        <h2 className="text-xl font-black text-slate-800 tracking-tight mt-1">
+                                            The Essentials.
+                                        </h2>
+                                        <p className="text-[11px] text-slate-600 leading-relaxed font-semibold mt-0.5">
+                                            Every classmate profile is verified to keep our community safe.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-4 pt-1 w-full text-left">
+                                        <div className="space-y-1.5">
+                                            <div className="flex justify-between items-end px-1">
+                                                <div>
+                                                    <label className="block text-[10px] font-extrabold text-[#0B3D2E] uppercase tracking-widest">Full Name</label>
+                                                    <p className="text-[9px] text-slate-500 font-semibold leading-none mt-1">Enter your real name as officially registered at school.</p>
+                                                </div>
+                                                <span className="text-[8px] text-rose-600 font-bold uppercase shrink-0">Required</span>
+                                            </div>
+                                            <div className="relative flex items-center group">
+                                                <User className="absolute left-4 text-slate-500 group-focus-within:text-emerald-600 transition-colors" size={16} />
+                                                <input 
+                                                    type="text" 
+                                                    required
+                                                    value={formData.fullName}
+                                                    onChange={e => setFormData({ ...formData, fullName: e.target.value })}
+                                                    className="w-full pl-11 pr-4 py-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 border border-slate-300 focus:border-emerald-600 outline-none text-xs text-slate-900 rounded-xl transition-all font-semibold placeholder:text-slate-500"
+                                                    placeholder="Example: Axzel Baril"
+                                                />
+                                            </div>
+                                            <p className="text-[9px] text-slate-500 font-medium ml-1">Necessary so classmate peers can recognize you during physical campus meetups.</p>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <div className="flex justify-between items-end px-1">
+                                                <div>
+                                                    <label className="block text-[10px] font-extrabold text-[#0B3D2E] uppercase tracking-widest">Course & Year</label>
+                                                    <p className="text-[9px] text-slate-500 font-semibold leading-none mt-1">Specify your current major program and study year.</p>
+                                                </div>
+                                                <span className="text-[8px] text-rose-600 font-bold uppercase shrink-0">Required</span>
+                                            </div>
+                                            <div className="relative flex items-center group">
+                                                <GraduationCap className="absolute left-4 text-slate-500 group-focus-within:text-[#10b981] transition-colors" size={16} />
+                                                <input 
+                                                    type="text" 
+                                                    required
+                                                    value={formData.courseAndYear}
+                                                    onChange={e => setFormData({ ...formData, courseAndYear: e.target.value })}
+                                                    className="w-full pl-11 pr-4 py-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 border border-slate-300 focus:border-emerald-600 outline-none text-xs text-slate-900 rounded-xl transition-all font-semibold placeholder:text-slate-500"
+                                                    placeholder="Example: BS Computer Engineering 3rd Year"
+                                                />
+                                            </div>
+                                            <p className="text-[9px] text-slate-500 font-medium ml-1">Connects you with student peers in your department or similar courses.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Slide 2: Tell Students About Yourself */}
+                                <div className="w-1/3 flex-shrink-0 px-1 flex flex-col justify-center text-left">
+                                    <div className="mb-4">
+                                        <span className="text-[9px] uppercase tracking-widest font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Step 2 OF 3</span>
+                                        <h2 className="text-xl font-black text-slate-800 tracking-tight mt-1">
+                                            Tell Students About Yourself
+                                        </h2>
+                                        <p className="text-[11px] text-slate-600 leading-relaxed font-semibold mt-0.5">
+                                            Create a short profile introduction so other students know who they are trading with.
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full space-y-3">
+                                        <div className="space-y-1.5">
+                                            <div className="flex justify-between items-center px-1">
+                                                <label className="block text-[10px] font-extrabold text-[#0B3D2E] uppercase tracking-widest">Profile Bio</label>
+                                                <span className="text-[8px] text-slate-500 font-bold uppercase">Optional</span>
+                                            </div>
+                                            <textarea 
+                                                value={formData.bio}
+                                                maxLength={150}
+                                                onChange={e => setFormData({ ...formData, bio: e.target.value.slice(0, 150) })}
+                                                className="w-full h-22 p-4 bg-slate-50 hover:bg-slate-100/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 border border-slate-300 focus:border-emerald-600 outline-none text-xs text-slate-900 rounded-xl transition-all font-semibold resize-none leading-relaxed placeholder:text-slate-500"
+                                                placeholder="Example: Computer Engineering student at PLSP. I sell textbooks, electronics, and school supplies."
+                                            />
+                                            <div className="flex justify-between items-center px-1">
+                                                <p className="text-[9px] text-slate-500 font-semibold leading-tight">2-3 sentences is enough. This helps build trust with other students.</p>
+                                                <span className={cn(
+                                                    "text-[8.5px] font-bold tracking-wider uppercase whitespace-nowrap",
+                                                    formData.bio.length >= 135 ? "text-amber-600" : "text-[#0B3D2E]"
+                                                )}>
+                                                    {formData.bio.length} / 150 characters
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Tip card */}
+                                        <div className="bg-emerald-50/70 border border-emerald-100/60 p-3 rounded-2xl flex items-start gap-2.5">
+                                            <Sparkles size={14} className="text-[#10b981] mt-0.5 flex-shrink-0 animate-pulse" />
+                                            <p className="text-[10px] text-emerald-900 font-semibold leading-normal">
+                                                Students with completed profiles receive more messages and sell items faster.
+                                            </p>
+                                        </div>
+                                        
+                                        {/* Quick bio filler templates */}
+                                        <div className="space-y-1.5 pt-0.5">
+                                            <p className="text-[9px] uppercase tracking-wider font-extrabold text-[#0B3D2E] ml-1">Tap a template to instant-fill:</p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {[
+                                                    { emoji: "💻", tag: "Engineering", text: "Computer Engineering student at PLSP. I sell textbooks, electronics, and school supplies." },
+                                                    { emoji: "📚", tag: "Academic", text: "Literature student at PLSP. Selling second-hand textbook guides, novels, and physical notebooks." },
+                                                    { emoji: "🌱", tag: "Dorm Life", text: "First year dorm student looking for handy school supplies, desk lamps, and textbooks." }
+                                                ].map((item, id) => {
+                                                    const isSelected = formData.bio === item.text;
+                                                    return (
+                                                        <button 
+                                                            key={id}
+                                                            type="button"
+                                                            onClick={() => setFormData({ ...formData, bio: item.text })}
+                                                            className={cn(
+                                                                "px-2.5 py-1.5 border text-[9px] font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1",
+                                                                isSelected 
+                                                                    ? "bg-[#0b3d2e] text-white border-[#0b3d2e] shadow-sm scale-102"
+                                                                    : "bg-slate-50 border-slate-300 text-slate-700 hover:bg-emerald-50 hover:border-emerald-500"
+                                                            )}
+                                                        >
+                                                            <span>{item.emoji}</span>
+                                                            <span>{item.tag}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Slide 3: Taste Form */}
+                                <div className="w-1/3 flex-shrink-0 px-1 flex flex-col justify-center text-left">
+                                    <div className="mb-4">
+                                        <span className="text-[9px] uppercase tracking-widest font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Step 3 OF 3</span>
+                                        <h2 className="text-xl font-black text-slate-800 tracking-tight mt-1">
+                                            What are your Interests?
+                                        </h2>
+                                        <p className="text-[11px] text-slate-600 leading-relaxed font-semibold mt-0.5">
+                                            Select your primary category preferences to adapt feed alerts.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-3 w-full">
+                                        <div className="space-y-1">
+                                            <label className="block text-[10px] font-extrabold text-[#0B3D2E] uppercase tracking-widest px-1">Category Preferences</label>
+                                            <p className="text-[9px] text-slate-500 font-semibold px-1">Tap the categories you are interested in buying, selling, or browsing to calibrate your recommendations.</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2 w-full pt-1">
+                                            {interests.map(interest => {
+                                                const isSelected = formData.interests.includes(interest);
+                                                return (
+                                                    <button
+                                                        key={interest}
+                                                        type="button"
+                                                        onClick={() => toggleInterest(interest)}
+                                                        className={cn(
+                                                            "h-12 px-3 border rounded-xl text-[11px] font-extrabold transition-all cursor-pointer flex items-center justify-between",
+                                                            isSelected
+                                                                ? "bg-emerald-50 border-emerald-500 text-[#0b3d2e] font-black ring-1 ring-emerald-500"
+                                                                : "bg-slate-50/50 border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-emerald-300"
+                                                        )}
+                                                    >
+                                                        <span className="uppercase tracking-wider">{interest}</span>
+                                                        {isSelected ? (
+                                                            <span className="w-4.5 h-4.5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-[8px]">✓</span>
+                                                        ) : (
+                                                            <span className="w-4.5 h-4.5 border border-slate-300 rounded-full flex items-center justify-center text-[8px]"></span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>                                   </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        {/* Controls Bottom Navigation bar */}
+                        <div className="mt-6 space-y-3 w-full">
+                            <button 
+                                type="button"
+                                onClick={step === 3 ? handleComplete : handleNext}
+                                disabled={step === 1 && (!formData.fullName.trim() || !formData.courseAndYear.trim())}
+                                className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-[#107050] hover:from-emerald-500 hover:to-[#0B3D2E] text-white font-extrabold text-xs uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 transition-all duration-300 shadow-lg shadow-emerald-900/10 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                            >
+                                <span>{step === 3 ? 'Complete Setup & Jump In' : 'Continue to Next Step'}</span>
+                                <ChevronRight size={14} />
+                            </button>
+
+                            {step > 1 && (
+                                <div className="text-center">
+                                    <button 
+                                        type="button"
+                                        onClick={handleBack}
+                                        className="text-slate-400 hover:text-emerald-800 transition-colors text-xxs font-extrabold uppercase tracking-widest cursor-pointer py-1 block w-full"
+                                    >
+                                        ← Go back to previous step
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Sub-card Trust Badge block */}
+                        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-center gap-2">
+                            <ShieldCheck size={14} className="text-[#10b981]" />
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Campus Peer Verification Enforced • Safe Zone Trade Only</span>
+                        </div>
+                    </div>
+
+                    {/* Left/Right Balance: visual logo accent decoration on mobile view */}
+                    <div className="mt-6 md:hidden flex flex-col items-center justify-center gap-1.5 z-10 opacity-70">
+                        <span className="text-[10px] font-black tracking-widest text-[#4ade80] uppercase">CampusMart Hub</span>
+                        <p className="text-[9px] text-white/50 font-medium">Verified student peer exchange network</p>
+                    </div>
+
+                    {/* Watermark building outline on mobile */}
+                    <div className="absolute bottom-0 left-0 right-0 w-full opacity-[0.04] md:hidden pointer-events-none select-none z-0">
+                        <img 
+                            src={campusBuildingSketch} 
+                            alt="Campus landmark drawing" 
+                            className="w-full h-auto object-cover object-bottom"
+                        />
+                    </div>
                 </div>
-            </motion.main>
+            </motion.div>
         </div>
     );
 };
@@ -3813,6 +4278,15 @@ const TutorialManager = () => {
 
 const AppContent = () => {
   const { loading, user } = useApp();
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <AnimatePresence mode="wait">
@@ -3838,7 +4312,7 @@ const AppContent = () => {
             <TutorialManager />
             <AnimatePresence mode="wait">
               <Routes>
-                <Route path="/" element={<LandingPage />} />
+                <Route path="/" element={isMobile ? <Navigate to="/login" replace /> : <LandingPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/onboarding" element={
                   user ? <OnboardingPage /> : <Navigate to="/login" replace />
