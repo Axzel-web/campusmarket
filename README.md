@@ -70,13 +70,7 @@ Try the latest Android version of CampusMart:
 
 ## Future Improvements
 
-- Product Rating and Review System
-- Order Tracking and Status Updates
-- Push Notification System
-- Wishlist and Favorites Feature
-- Advanced Product Search and Filtering
 - In-App Payment Integration
-- Analytics Dashboard for Sellers
 - AI-Based Product Recommendations
 
 ## Installation
