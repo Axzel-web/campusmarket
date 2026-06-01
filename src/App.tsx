@@ -42,7 +42,10 @@ import {
   Eye,
   EyeOff,
   LogIn,
-  GraduationCap
+  GraduationCap,
+  MapPin,
+  Phone,
+  Clock
 } from 'lucide-react';
 import { SpiderCursor } from "./components/ui/spider-cursor";
 import { UserProfile, Listing, Chat, ChatMessage, Review, SellerApplication, Transaction } from './types';
@@ -59,6 +62,15 @@ import { SecuritySettingsPage } from './components/SecuritySettingsPage';
 import { supabase } from './lib/supabase';
 import { uploadProductImage } from './services/productService';
 import { SpotlightTutorial } from './components/SpotlightTutorial';
+import { BuyNowModal } from './components/BuyNowModal';
+import { 
+  SupabaseOrder, 
+  createSupabaseOrder, 
+  fetchBuyerOrders, 
+  fetchSellerOrders, 
+  updateSupabaseOrderStatus, 
+  subscribeToUserOrders 
+} from './services/orderService';
 const campusMarketLogo = "https://lh3.googleusercontent.com/d/13tC-_YnLvpr47f5FK7LFeasDSQgUduvx";
 import campusBuildingSketch from './assets/images/campus_building_sket_1780133932997.png';
 
@@ -174,6 +186,9 @@ interface AppContextType {
   isSupabaseConnected: boolean;
   aiDraft: any | null;
   setAiDraft: (draft: any | null) => void;
+  orders: SupabaseOrder[];
+  createOrder: (orderData: Omit<SupabaseOrder, 'order_id' | 'created_at' | 'payment_method' | 'order_status'> & { buyer_name?: string; seller_name?: string }) => Promise<SupabaseOrder>;
+  updateOrderStatus: (orderId: string, status: SupabaseOrder['order_status']) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -968,7 +983,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 md:bg-[#08231a] relative flex items-center justify-center p-0 md:p-8 font-sans overflow-y-auto select-none">
+    <div className="min-h-screen md:h-screen w-full bg-slate-50 md:bg-[#08231a] relative flex items-center justify-center p-0 md:p-4 lg:p-8 font-sans overflow-y-auto md:overflow-hidden select-none">
       {/* Visual background decorations in screenshot style - light slates on mobile, emerald on desktop */}
       <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1.5px,transparent_1.5px)] md:bg-[radial-gradient(#14532d_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-50 md:opacity-40"></div>
       
@@ -992,7 +1007,7 @@ const LoginPage = () => {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: "easeOut" }}
-        className="relative w-full md:max-w-[1024px] min-h-screen md:min-h-[640px] md:h-auto bg-white md:bg-[#0E3D2F]/10 md:backdrop-blur-md md:rounded-3xl md:border md:border-white/[0.08] md:shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col md:flex-row overflow-hidden z-10"
+        className="relative w-full h-fit md:h-[640px] md:max-h-[90vh] md:max-w-[1024px] bg-white md:bg-[#0E3D2F]/10 md:backdrop-blur-md md:rounded-3xl md:border md:border-white/[0.08] md:shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col md:flex-row overflow-hidden z-10"
       >
         {/* Left Hand Side: Banner display and branding (Visible on desktop only) */}
         <div className="hidden md:flex md:w-[45%] bg-white flex-col justify-between p-8 relative overflow-hidden select-none border-r border-[#14532D]/10">
@@ -1037,33 +1052,33 @@ const LoginPage = () => {
         </div>
 
         {/* Right Hand Side: Interactive input form. Adapts fully to white on mobile, deep green on desktop */}
-        <div className="w-full md:w-[55%] bg-white md:bg-gradient-to-br md:from-[#0B3D2E] md:via-[#0d4f3b] md:to-[#14532D] flex flex-col justify-between p-6 sm:p-10 md:p-12 relative overflow-y-auto select-none">
+        <div className="w-full md:w-[55%] bg-white md:bg-gradient-to-br md:from-[#0B3D2E] md:via-[#0d4f3b] md:to-[#14532D] flex flex-col justify-between p-4 sm:p-6 md:p-8 relative overflow-y-auto md:overflow-hidden select-none h-fit md:h-full">
           {/* Mobile Back Button removed for direct-login mobile experience */}
 
           {/* Mobile Logo Block - Visible at top on mobile only to match the phone mockup layout */}
-          <div className="flex md:hidden flex-col items-center justify-center mt-4 mb-4">
+          <div className="flex md:hidden flex-col items-center justify-center mt-1.5 mb-1.5">
             <img 
               src={campusMarketLogo} 
               alt="Campus Market Logo" 
               referrerPolicy="no-referrer"
-              className="w-56 sm:w-64 h-auto object-contain drop-shadow-[0_4px_12px_rgba(20,83,45,0.08)]"
+              className="w-28 sm:w-36 h-auto object-contain drop-shadow-[0_4px_12px_rgba(20,83,45,0.08)]"
             />
           </div>
 
-          <div className="w-full max-w-[380px] mx-auto my-auto py-2 z-10">
-            <div className="text-center mb-5 sm:mb-6">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-800 md:text-white tracking-tight">
+          <div className="w-full max-w-[380px] mx-auto my-auto py-1.5 z-10">
+            <div className="text-center mb-3 sm:mb-4">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-800 md:text-white tracking-tight">
                 {mode === 'login' ? 'Welcome Back!' : 'Join Campus Market'}
               </h2>
-              <div className="w-16 h-1 bg-emerald-600 md:bg-[#4ade80] mx-auto my-2 rounded-full"></div>
-              <p className="text-xs text-slate-500 md:text-white/70 leading-relaxed font-medium">
+              <div className="w-12 h-0.75 bg-emerald-600 md:bg-[#4ade80] mx-auto my-1.5 rounded-full"></div>
+              <p className="text-[11px] text-slate-500 md:text-white/70 leading-relaxed font-medium">
                 {mode === 'login' 
                   ? 'Login to your Campus Market account and start buying, selling and connecting.' 
                   : 'Register nested inside university domain and explore endless student listings.'}
               </p>
             </div>
 
-            <form onSubmit={handleEmailAuth} className="space-y-4">
+            <form onSubmit={handleEmailAuth} className="space-y-3">
               <div className="space-y-1">
                 <label className="block text-[11px] font-bold text-slate-700 md:text-white/85 uppercase tracking-widest ml-1">Email Address</label>
                 <div className="relative flex items-center group">
@@ -1074,7 +1089,7 @@ const LoginPage = () => {
                     placeholder="Enter your email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50 md:bg-[#0B2E24]/40 hover:bg-slate-100/50 md:hover:bg-[#0B2E24]/60 focus:bg-white md:focus:bg-[#061F17] focus:ring-1 focus:ring-emerald-500 border border-slate-200 md:border-white/10 focus:border-emerald-500 md:focus:border-[#4ade80] outline-none text-sm text-slate-900 md:text-white rounded-2xl placeholder:text-slate-400 md:placeholder:text-white/30 transition-all font-medium"
+                    className="w-full pl-11 pr-4 py-2.5 bg-slate-50 md:bg-[#0B2E24]/40 hover:bg-slate-100/50 md:hover:bg-[#0B2E24]/60 focus:bg-white md:focus:bg-[#061F17] focus:ring-1 focus:ring-emerald-500 border border-slate-200 md:border-white/10 focus:border-emerald-500 md:focus:border-[#4ade80] outline-none text-sm text-slate-900 md:text-white rounded-2xl placeholder:text-slate-400 md:placeholder:text-white/30 transition-all font-medium"
                   />
                 </div>
               </div>
@@ -1089,7 +1104,7 @@ const LoginPage = () => {
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-11 pr-11 py-3 bg-slate-50 md:bg-[#0B2E24]/40 hover:bg-slate-100/50 md:hover:bg-[#0B2E24]/60 focus:bg-white md:focus:bg-[#061F17] focus:ring-1 focus:ring-emerald-500 border border-slate-200 md:border-white/10 focus:border-emerald-500 md:focus:border-[#4ade80] outline-none text-sm text-slate-900 md:text-white rounded-2xl placeholder:text-slate-400 md:placeholder:text-white/30 transition-all font-medium"
+                    className="w-full pl-11 pr-11 py-2.5 bg-slate-50 md:bg-[#0B2E24]/40 hover:bg-slate-100/50 md:hover:bg-[#0B2E24]/60 focus:bg-white md:focus:bg-[#061F17] focus:ring-1 focus:ring-emerald-500 border border-slate-200 md:border-white/10 focus:border-emerald-500 md:focus:border-[#4ade80] outline-none text-sm text-slate-900 md:text-white rounded-2xl placeholder:text-slate-400 md:placeholder:text-white/30 transition-all font-medium"
                   />
                   <button 
                     type="button"
@@ -1126,7 +1141,7 @@ const LoginPage = () => {
               <button 
                 type="submit"
                 disabled={loggingIn}
-                className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-green-750 hover:from-emerald-400 hover:to-emerald-600 text-white font-extrabold text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2.5 transition-all duration-300 shadow-lg shadow-emerald-550/10 md:shadow-emerald-950/40 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer mt-4"
+                className="w-full py-2.5 md:py-3.5 bg-gradient-to-r from-emerald-500 to-green-750 hover:from-emerald-400 hover:to-emerald-600 text-white font-extrabold text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2.5 transition-all duration-300 shadow-lg shadow-emerald-550/10 md:shadow-emerald-950/40 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer mt-2 md:mt-4"
               >
                 {loggingIn ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -1139,47 +1154,28 @@ const LoginPage = () => {
               </button>
             </form>
 
-            <div className="relative flex items-center my-5 sm:my-6">
+            <div className="relative flex items-center my-3.5 md:my-5">
               <div className="flex-grow border-t border-slate-200 md:border-white/10"></div>
               <span className="flex-shrink px-3 text-[10px] font-bold text-slate-400 md:text-white/30 uppercase tracking-widest">or continue with</span>
               <div className="flex-grow border-t border-slate-200 md:border-white/10"></div>
             </div>
 
-            {/* Google, FB, Apple Row */}
-            <div className="flex gap-3">
+            {/* Google Authentication */}
+            <div className="w-full">
               <button 
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={loggingIn}
-                className="flex-1 py-3 bg-white hover:bg-slate-50 md:bg-white/5 md:hover:bg-white/11 border border-slate-200 md:border-white/10 hover:border-slate-300 md:hover:border-white/20 rounded-2xl flex items-center justify-center transition-all cursor-pointer disabled:opacity-50 shadow-sm md:shadow-none"
+                className="w-full py-2.5 md:py-3.5 bg-white hover:bg-slate-50 md:bg-white/5 md:hover:bg-white/11 border border-slate-200 md:border-white/10 hover:border-slate-300 md:hover:border-white/20 rounded-2xl flex items-center justify-center gap-3 transition-all cursor-pointer disabled:opacity-50 shadow-sm md:shadow-none text-slate-700 md:text-white text-xs font-extrabold uppercase tracking-widest leading-none"
                 title="Sign in with Google"
               >
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-              </button>
-              <button 
-                type="button"
-                onClick={() => setError("Facebook authentication will be supported in future versions. Use Google or your email.")}
-                className="flex-1 py-3 bg-white hover:bg-slate-50 md:bg-white/5 md:hover:bg-white/11 border border-slate-200 md:border-white/10 hover:border-slate-300 md:hover:border-white/20 rounded-2xl flex items-center justify-center transition-all cursor-pointer shadow-sm md:shadow-none"
-                title="Sign in with Facebook"
-              >
-                <svg className="w-5 h-5 text-[#1877F2] fill-current" viewBox="0 0 24 24">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-              </button>
-              <button 
-                type="button"
-                onClick={() => setError("Apple OAuth will be supported in future versions. Use Google or your email.")}
-                className="flex-1 py-3 bg-white hover:bg-slate-50 md:bg-white/5 md:hover:bg-white/11 border border-slate-200 md:border-white/10 hover:border-slate-300 md:hover:border-white/20 rounded-2xl flex items-center justify-center transition-all cursor-pointer shadow-sm md:shadow-none"
-                title="Sign in with Apple"
-              >
-                <svg className="w-5 h-5 text-slate-800 md:text-white fill-current" viewBox="0 0 24 24">
-                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.22.67-2.94 1.5-.64.74-1.2 1.88-1.05 3 .11.1 1.24.04 2.15-.42z"/>
-                </svg>
+                <span>Continue with Google</span>
               </button>
             </div>
 
             {/* Alternating mode link */}
-            <div className="text-center text-xs text-slate-500 md:text-white/60 font-medium mt-6 sm:mt-8">
+            <div className="text-center text-xs text-slate-500 md:text-white/60 font-medium mt-3.5 md:mt-6">
               {mode === 'login' ? (
                 <>
                   Don't have an account?{' '}
@@ -1207,7 +1203,7 @@ const LoginPage = () => {
           </div>
 
           {/* Core Footer section "Safe • Secure • Trusted" */}
-          <div className="mt-6 pt-4 border-t border-slate-150 md:border-white/5 flex items-center justify-center gap-3 z-10">
+          <div className="mt-3 md:mt-6 pt-2 md:pt-4 border-t border-slate-150 md:border-white/5 flex items-center justify-center gap-3 z-10">
             <div className="w-8 h-8 rounded-full bg-emerald-50 md:bg-emerald-500/10 flex items-center justify-center text-emerald-600 md:text-[#4ade80] border border-emerald-100 md:border-emerald-500/20">
               <ShieldCheck size={18} />
             </div>
@@ -2137,6 +2133,7 @@ const SellPage = () => {
     const listing = listings.find(l => l.id === id);
     const [activeImageIndex, setActiveImageIndex] = useState(0);
     const [buying, setBuying] = useState(false);
+    const [isBuyModalOpen, setIsBuyModalOpen] = useState(false);
     const isFavorite = listing ? favorites.includes(listing.id) : false;
   
     useEffect(() => {
@@ -2148,30 +2145,14 @@ const SellPage = () => {
         }).catch(console.error);
       }
     }, [id, user?.id]);
-
+ 
     const handleBuy = async () => {
         if (!listing) return;
-        
-        const fee = listing.price * 0.05;
-        const sellerGets = listing.price - fee;
-
-        if (!window.confirm(
-            `Transaction Breakdown:\n\n` +
-            `Product Price: ₱${listing.price.toLocaleString()}\n` +
-            `Platform Fee (5%): ₱${fee.toLocaleString()}\n` +
-            `Seller Receives: ₱${sellerGets.toLocaleString()}\n\n` +
-            `Are you sure you want to commit to buying "${listing.title}"?`
-        )) return;
-        
-        setBuying(true);
-        try {
-            const tid = await createTransaction(listing, 'cash_on_meetup');
-            if (tid) {
-                navigate('/purchases');
-            }
-        } finally {
-            setBuying(false);
+        if (!user) {
+            alert('Please log in to your CampusMart account first to reserve and buy products.');
+            return;
         }
+        setIsBuyModalOpen(true);
     };
   
     if (!listing) return null;
@@ -2398,6 +2379,12 @@ const SellPage = () => {
             </div>
         </div>
        </div>
+
+       <BuyNowModal 
+         isOpen={isBuyModalOpen} 
+         onClose={() => setIsBuyModalOpen(false)} 
+         listing={listing} 
+       />
     </div>
   );
 };
@@ -2422,6 +2409,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages] = useState<ChatMessage[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [orders, setOrders] = useState<SupabaseOrder[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [listingsLoading, setListingsLoading] = useState(true);
@@ -2679,6 +2667,94 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     return unsubscribe;
   }, [user]);
 
+  // Sync Supabase Orders
+  useEffect(() => {
+    if (!user) {
+      setOrders([]);
+      return;
+    }
+
+    let active = true;
+    let subscription: any = null;
+
+    const loadOrders = async () => {
+      try {
+        if (!supabase) {
+          // Fallback to localStorage if Supabase keys aren't set
+          const stored = localStorage.getItem(`orders_${user.id}`);
+          if (stored && active) {
+            setOrders(JSON.parse(stored));
+          }
+          return;
+        }
+
+        let buyerRes: SupabaseOrder[] = [];
+        let sellerRes: SupabaseOrder[] = [];
+
+        try {
+          const [buyer, seller] = await Promise.all([
+            fetchBuyerOrders(user.id),
+            fetchSellerOrders(user.id)
+          ]);
+          buyerRes = buyer || [];
+          sellerRes = seller || [];
+        } catch (dbErr) {
+          console.warn("Supabase orders load failed, probably missing 'orders' table. Using local storage fallback:", dbErr);
+        }
+
+        if (!active) return;
+
+        // Merge both Supabase database results (if any succeed) with localStorage items as backups
+        const stored = localStorage.getItem(`orders_${user.id}`);
+        const localOrders: SupabaseOrder[] = stored ? JSON.parse(stored) : [];
+
+        const mergedOrders = [...buyerRes, ...sellerRes, ...localOrders];
+        // Deduplicate and sort descending by created_at
+        const uniqueOrders = mergedOrders.filter((item, index, self) =>
+          self.findIndex(t => t.order_id === item.order_id) === index
+        );
+        uniqueOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setOrders(uniqueOrders);
+
+        // Set up Realtime subscription
+        subscription = subscribeToUserOrders(user.id, (payload) => {
+          if (!active) return;
+          console.log("Real-time orders update received:", payload);
+          if (payload.eventType === 'INSERT') {
+            const newOrd = payload.new as SupabaseOrder;
+            setOrders(prev => {
+              if (prev.some(o => o.order_id === newOrd.order_id)) return prev;
+              const next = [newOrd, ...prev];
+              next.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+              return next;
+            });
+            // Update listing as sold locally if list contains it
+            if (newOrd.product_id) {
+              setListings(prev => prev.map(l => l.id === newOrd.product_id ? { ...l, status: 'sold' } : l));
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedOrd = payload.new as SupabaseOrder;
+            setOrders(prev => prev.map(o => (o.order_id === updatedOrd.order_id || o.id === updatedOrd.id) ? updatedOrd : o));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedOrd = payload.old as SupabaseOrder;
+            setOrders(prev => prev.filter(o => o.order_id !== deletedOrd.order_id && o.id !== deletedOrd.id));
+          }
+        });
+      } catch (err) {
+        console.warn("Error initializing supabase orders:", err);
+      }
+    };
+
+    loadOrders();
+
+    return () => {
+      active = false;
+      if (subscription) {
+        supabase?.removeChannel(subscription);
+      }
+    };
+  }, [user]);
+
   const login = async () => {
     try {
       const provider = new GoogleAuthProvider();
@@ -2741,6 +2817,227 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
       addNotification(`Transaction status: ${status}`, 'info');
     } catch (error) {
       handleFirestoreError(error, 'update', `transactions/${transactionId}`);
+    }
+  };
+
+  const createOrder = async (orderData: Omit<SupabaseOrder, 'order_id' | 'created_at' | 'payment_method' | 'order_status'> & { buyer_name?: string; seller_name?: string }) => {
+    if (!user) throw new Error('You must be logged in to buy items.');
+
+    try {
+      if (!supabase) {
+        // Fallback to offline local storage if supabase is not connected!
+        const orderId = 'ORD-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+        const localNewOrder: SupabaseOrder = {
+          ...orderData,
+          order_id: orderId,
+          payment_method: 'Meetup',
+          order_status: 'Pending',
+          created_at: new Date().toISOString()
+        };
+
+        const updatedOrders = [localNewOrder, ...orders];
+        setOrders(updatedOrders);
+        localStorage.setItem(`orders_${user.id}`, JSON.stringify(updatedOrders));
+        
+        // Also sync list locally
+        setListings(prev => prev.map(l => l.id === orderData.product_id ? { ...l, status: 'sold' } : l));
+        
+        // We can write to firestore listings as well to display sold state on the web
+        try {
+          const listingRef = doc(db, 'listings', orderData.product_id);
+          await updateDoc(listingRef, {
+            status: 'sold',
+            updatedAt: serverTimestamp()
+          });
+        } catch (err) {
+          console.warn("Failed to mark listing as sold on Firebase:", err);
+        }
+
+        addNotification(`Order placed successfully for ${orderData.product_name}!`, 'success');
+        return localNewOrder;
+      }
+
+      let result;
+      try {
+        result = await createSupabaseOrder({
+          ...orderData,
+          buyer_id: user.id,
+          buyer_name: user.fullName
+        });
+      } catch (dbErr: any) {
+        console.warn("Failed to create order in Supabase. Checking if orders table is missing:", dbErr);
+        const errMsg = dbErr?.message || "";
+        const isTableMissing = dbErr?.code === '42P01' || 
+                              errMsg.includes('orders') || 
+                              errMsg.includes('schema cache') || 
+                              errMsg.includes('relation') ||
+                              dbErr?.status === 404;
+
+        if (isTableMissing) {
+          // Fallback to offline local storage if supabase table is not created yet
+          const orderId = 'ORD-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+          const localNewOrder: SupabaseOrder = {
+            ...orderData,
+            order_id: orderId,
+            id: orderId,
+            buyer_id: user.id,
+            buyer_name: user.fullName,
+            payment_method: 'Meetup',
+            order_status: 'Pending',
+            created_at: new Date().toISOString()
+          };
+
+          const updatedOrders = [localNewOrder, ...orders];
+          setOrders(updatedOrders);
+          localStorage.setItem(`orders_${user.id}`, JSON.stringify(updatedOrders));
+          
+          setListings(prev => prev.map(l => l.id === orderData.product_id ? { ...l, status: 'sold' } : l));
+          
+          try {
+            const listingRef = doc(db, 'listings', orderData.product_id);
+            await updateDoc(listingRef, {
+              status: 'sold',
+              updatedAt: serverTimestamp()
+            });
+          } catch (err) {
+            console.warn("Failed to mark listing as sold on Firebase:", err);
+          }
+
+          addNotification(`The 'orders' table is not yet created in your Supabase database. Your order was securely saved locally for now!`, 'info');
+          return localNewOrder;
+        } else {
+          addNotification(`Order Creation Failed: ${dbErr.message || dbErr}`, 'error');
+          throw dbErr;
+        }
+      }
+
+      // Mark product as sold in listings
+      try {
+        const listingRef = doc(db, 'listings', orderData.product_id);
+        await updateDoc(listingRef, {
+          status: 'sold',
+          updatedAt: serverTimestamp()
+        });
+      } catch (err) {
+        console.warn("Failed to mark listing as sold on Firebase:", err);
+      }
+
+      // Supabase mirror update
+      try {
+        await supabase.from('listings').update({ status: 'sold' }).eq('id', orderData.product_id);
+      } catch (err) {
+        console.warn("Failed to mark listing as sold in Supabase:", err);
+      }
+
+      // Add to local state manually to ensure prompt update
+      setOrders(prev => [result, ...prev]);
+
+      addNotification(`Order placed successfully!`, 'success');
+      return result;
+    } catch (error: any) {
+      if (!error?.message?.includes('schema cache') && !error?.message?.includes('orders')) {
+        addNotification(`Order Creation Failed: ${error.message || error}`, 'error');
+      }
+      throw error;
+    }
+  };
+
+  const updateOrderStatus = async (orderId: string, status: SupabaseOrder['order_status']) => {
+    if (!user) return;
+    try {
+      if (!supabase) {
+        // Local state update fallback
+        setOrders(prev => {
+          const next = prev.map(o => o.order_id === orderId ? { ...o, order_status: status } : o);
+          localStorage.setItem(`orders_${user.id}`, JSON.stringify(next));
+          return next;
+        });
+        
+        // Also handle listing status reversal if order is cancelled
+        if (status === 'Cancelled') {
+          const order = orders.find(o => o.order_id === orderId);
+          if (order) {
+            try {
+              const listingRef = doc(db, 'listings', order.product_id);
+              await updateDoc(listingRef, {
+                status: 'active',
+                updatedAt: serverTimestamp()
+              });
+            } catch (err) {
+              console.warn("Failed to mark listing active on firestore:", err);
+            }
+          }
+        }
+
+        addNotification(`Order status updated to ${status}!`, 'success');
+        return;
+      }
+
+      try {
+        await updateSupabaseOrderStatus(orderId, status);
+      } catch (dbErr: any) {
+        console.warn("Failed to update order status in Supabase. Checking if table is missing:", dbErr);
+        const errMsg = dbErr?.message || "";
+        const isTableMissing = dbErr?.code === '42P01' || 
+                              errMsg.includes('orders') || 
+                              errMsg.includes('schema cache') || 
+                              errMsg.includes('relation') ||
+                              dbErr?.status === 404;
+
+        if (isTableMissing) {
+          setOrders(prev => {
+            const next = prev.map(o => o.order_id === orderId ? { ...o, order_status: status } : o);
+            localStorage.setItem(`orders_${user.id}`, JSON.stringify(next));
+            return next;
+          });
+
+          if (status === 'Cancelled') {
+            const order = orders.find(o => o.order_id === orderId);
+            if (order) {
+              setListings(prev => prev.map(l => l.id === order.product_id ? { ...l, status: 'active' } : l));
+              try {
+                const listingRef = doc(db, 'listings', order.product_id);
+                await updateDoc(listingRef, {
+                  status: 'active',
+                  updatedAt: serverTimestamp()
+                });
+              } catch (err) {
+                console.warn("Failed to mark listing active on firestore:", err);
+              }
+            }
+          }
+
+          addNotification(`Local order status updated to ${status} successfully!`, 'success');
+          return;
+        } else {
+          throw dbErr;
+        }
+      }
+
+      // Local update as callback failsafe
+      setOrders(prev => prev.map(o => o.order_id === orderId ? { ...o, order_status: status } : o));
+
+      // Also reset product back to 'active' if seller cancels
+      if (status === 'Cancelled') {
+        const order = orders.find(o => o.order_id === orderId);
+        if (order) {
+          try {
+            const listingRef = doc(db, 'listings', order.product_id);
+            await updateDoc(listingRef, {
+              status: 'active',
+              updatedAt: serverTimestamp()
+            });
+            await supabase.from('listings').update({ status: 'active' }).eq('id', order.product_id);
+          } catch (err) {
+            console.warn("Failed to revert listing status:", err);
+          }
+        }
+      }
+
+      addNotification(`Order status updated to ${status}!`, 'info');
+    } catch (err: any) {
+      console.error("Failed to update order status:", err);
+      addNotification(`Failed to update status: ${err.message || err}`, 'error');
     }
   };
 
@@ -3138,7 +3435,10 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
       notifications, addNotification, removeNotification,
       isSupabaseConnected,
       aiDraft,
-      setAiDraft
+      setAiDraft,
+      orders,
+      createOrder,
+      updateOrderStatus
     }}>
       {children}
     </AppContext.Provider>
@@ -3299,18 +3599,20 @@ const ChatPage = () => {
 };
 
 const SellerDashboardPage = () => {
-  const { user, reviews, myListings, replyToReview, archiveReview, reportReview, markAsSold, deleteListing, isSupabaseConnected } = useApp();
+  const { user, reviews, myListings, replyToReview, archiveReview, reportReview, markAsSold, deleteListing, isSupabaseConnected, orders, updateOrderStatus } = useApp();
   if (!user) return null;
   return (
     <SellerDashboard 
       user={user} 
       reviews={reviews} 
       listings={myListings}
+      orders={orders}
       onReply={replyToReview}
       onArchive={archiveReview}
       onReport={reportReview}
       onMarkAsSold={markAsSold}
       onDeleteListing={deleteListing}
+      onUpdateOrderStatus={updateOrderStatus}
       isSupabaseConnected={isSupabaseConnected}
     />
   );
@@ -3419,7 +3721,21 @@ const OnboardingPage = () => {
     };
 
     const handleSkip = () => {
-        if (step === 2) {
+        if (step === 1) {
+            const updatedData = { ...formData };
+            if (!updatedData.fullName.trim()) updatedData.fullName = "Campus Student";
+            if (!updatedData.courseAndYear.trim()) updatedData.courseAndYear = "PLSP Student";
+            setFormData(updatedData);
+            setTimeout(() => {
+                updateProfile({
+                    ...updatedData,
+                    onboarded: true
+                });
+                localStorage.removeItem('campusListingTutorialSeen');
+                addNotification("Welcome to CampusMart!", "success");
+                navigate('/market');
+            }, 50);
+        } else if (step === 2) {
             handleNext();
         } else if (step === 3) {
             handleComplete();
@@ -3433,7 +3749,7 @@ const OnboardingPage = () => {
     } as React.CSSProperties;
 
     return (
-        <div className="min-h-screen w-full bg-[#08231a] relative flex items-center justify-center p-0 md:p-8 font-sans overflow-y-auto select-none">
+        <div className="min-h-screen md:h-screen w-full bg-[#08231a] relative flex items-center justify-center p-0 md:p-4 lg:p-8 font-sans overflow-y-auto md:overflow-hidden select-none">
             {/* Visual background decorations in screenshot style - light slates on mobile, emerald on desktop */}
             <div className="absolute inset-0 bg-[radial-gradient(#14532d_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-40"></div>
             
@@ -3457,7 +3773,7 @@ const OnboardingPage = () => {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: "easeOut" }}
-                className="relative w-full md:max-w-[1120px] min-h-screen md:min-h-[660px] md:h-auto bg-[#0E3D2F]/10 md:backdrop-blur-xl md:rounded-3xl md:border md:border-white/[0.08] md:shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col md:flex-row overflow-y-auto md:overflow-hidden z-10"
+                className="relative w-full h-fit md:h-[min(680px,90vh)] md:max-w-[1120px] bg-white md:bg-[#0E3D2F]/10 md:backdrop-blur-xl md:rounded-3xl md:border md:border-white/[0.08] md:shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col md:flex-row overflow-hidden z-10"
             >
                 {/* Left Hand Side: Dynamic interactive step illustration and explicit core benefit lists (Desktop only) */}
                 <div className="hidden md:flex md:w-[48%] bg-white flex-col justify-between p-8 xl:p-10 relative overflow-hidden select-none border-r border-[#14532D]/10">
@@ -3496,13 +3812,13 @@ const OnboardingPage = () => {
                                                 : "https://d.top4top.io/p_20200jsuo2.png"
                                     } 
                                     alt={`Onboarding step ${step}`} 
-                                    className="w-full h-auto object-contain max-h-[260px] drop-shadow-[0_12px_24px_rgba(20,83,45,0.08)]"
+                                    className="w-full h-auto object-contain max-h-[150px] lg:max-h-[190px] drop-shadow-[0_12px_24px_rgba(20,83,45,0.08)]"
                                 />
                             </motion.div>
                         </AnimatePresence>
 
                         {/* Direct Core Benefits HUD (Step interactive highlight tracker) */}
-                        <div className="space-y-3 w-full mt-6 text-left">
+                        <div className="space-y-2.5 w-full mt-4 text-left">
                             <div className="text-left mb-1.5">
                                 <h3 className="text-lg font-black text-slate-800 tracking-tight leading-tight">
                                     Your University Marketplace
@@ -3582,29 +3898,30 @@ const OnboardingPage = () => {
                 </div>
 
                 {/* Right Hand Side: Beautiful card-based interactive form container. Uses gorgeous consistent dark-green/white styling */}
-                <div className="w-full md:w-[52%] bg-gradient-to-br from-[#0B3D2E] via-[#0D4F3B] to-[#14532D] flex flex-col justify-center items-center p-4 sm:p-8 md:p-10 relative select-none">
+                <div className="w-full md:w-[52%] bg-gradient-to-br from-[#0B3D2E] via-[#0D4F3B] to-[#14532D] flex flex-col justify-center items-center px-4 py-8 sm:p-6 md:p-8 relative select-none min-h-screen md:min-h-0 h-auto md:h-full overflow-y-auto md:overflow-hidden">
                     
-                    {/* Floating top Skip option */}
-                    {step > 1 && (
-                        <button 
-                            type="button"
-                            onClick={handleSkip}
-                            className="absolute top-6 right-6 text-[10px] uppercase tracking-widest font-extrabold text-[#4ade80] hover:text-[#58ec94] transition-colors z-20 cursor-pointer flex items-center gap-1 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10"
-                        >
-                            <span>Skip For Now</span>
-                            <ChevronRight size={12} />
-                        </button>
-                    )}
-
                     {/* Main White Card of the onboarding page */}
-                    <div className="w-full max-w-[440px] bg-white rounded-3xl shadow-[0_24px_60px_rgba(8,30,22,0.45)] border border-slate-100 p-5 sm:p-8 flex flex-col justify-between relative z-10 min-h-[480px]">
+                    <div className="w-full max-w-[440px] bg-white rounded-3xl shadow-[0_24px_60px_rgba(8,30,22,0.45)] border border-slate-100 p-5 sm:p-6 md:p-8 flex flex-col justify-between relative z-10 h-auto md:h-full md:max-h-[580px] overflow-y-auto md:overflow-visible">
                         
+                        {/* Integrated Top Header with Skip Button */}
+                        <div className="flex items-center justify-between w-full mb-4 pb-3 border-b border-slate-100 shrink-0">
+                            <span className="text-[10px] font-black text-[#0B3D2E] tracking-widest uppercase">Campus Setup</span>
+                            <button 
+                                type="button"
+                                onClick={handleSkip}
+                                className="text-[10px] uppercase tracking-wider font-extrabold text-[#0B3D2E] hover:text-emerald-900 transition-all cursor-pointer flex items-center gap-1 bg-emerald-50 hover:bg-[#4ade80]/20 px-3 py-1.5 rounded-full border border-emerald-100 hover:border-emerald-200 active:scale-95"
+                            >
+                                <span>Skip For Now</span>
+                                <ChevronRight size={11} className="stroke-[3]" />
+                            </button>
+                        </div>
+
                         {/* Improved Interactive Progress Timeline Tracker */}
-                        <div className="flex items-center justify-between w-full mb-6 relative px-3">
-                            <div className="absolute top-[15px] left-0 right-0 h-0.5 bg-slate-100 -translate-y-1/2 z-0"></div>
+                        <div className="flex items-center justify-between w-full mb-5 relative px-1 sm:px-3 shrink-0">
+                            <div className="absolute top-[14px] left-4 right-4 h-0.5 bg-slate-100 -translate-y-1/2 z-0"></div>
                             <div 
-                                className="absolute top-[15px] left-0 h-0.5 bg-emerald-500 -translate-y-1/2 transition-all duration-300 z-0"
-                                style={{ width: step === 1 ? '15%' : step === 2 ? '50%' : '85%' }}
+                                className="absolute top-[14px] left-4 h-0.5 bg-emerald-500 -translate-y-1/2 transition-all duration-300 z-0"
+                                style={{ width: step === 1 ? '15%' : step === 2 ? '50%' : '72%' }}
                             ></div>
                             
                             {[
@@ -3615,222 +3932,233 @@ const OnboardingPage = () => {
                                 const isActive = step === s.num;
                                 const isCompleted = step > s.num;
                                 return (
-                                    <div key={s.num} className="flex flex-col items-center z-10">
+                                    <div key={s.num} className="flex flex-col items-center z-10 w-1/3">
                                         <div className={cn(
-                                            "w-7.5 h-7.5 rounded-full flex items-center justify-center font-bold text-xxs transition-all duration-300",
+                                            "w-7 h-7 rounded-full flex items-center justify-center font-bold text-xxs transition-all duration-300",
                                             isCompleted 
                                                 ? "bg-emerald-600 text-white shadow-sm" 
                                                 : isActive 
                                                     ? "bg-[#0b3d2e] text-[#4ade80] ring-4 ring-[#0b3d2e]/10 shadow-md scale-105" 
                                                     : "bg-white border-2 border-slate-200 text-slate-400"
                                         )}>
-                                            {isCompleted ? <Check size={12} className="stroke-[3.5]" /> : s.num}
+                                            {isCompleted ? <Check size={11} className="stroke-[3.5]" /> : s.num}
                                         </div>
                                         <span className={cn(
-                                            "text-[9px] uppercase tracking-wider font-black mt-2 leading-none",
-                                            isActive ? "text-[#0b3d2e]" : isCompleted ? "text-emerald-600" : "text-slate-400"
+                                            "text-[9px] uppercase tracking-wider font-extrabold mt-1.5 leading-none text-center truncate px-1",
+                                            isActive ? "text-[#0b3d2e] font-black" : isCompleted ? "text-emerald-600" : "text-slate-400"
                                         )}>
                                             {s.label}
                                         </span>
-                                        <span className="text-[7.5px] text-slate-400 font-extrabold mt-0.5">{s.desc}</span>
+                                        <span className="hidden sm:inline-block text-[7.5px] text-slate-400 font-extrabold mt-0.5">{s.desc}</span>
                                     </div>
                                 );
                             })}
                         </div>
 
-                        {/* Interactive Steps slide views */}
-                        <div className="overflow-hidden flex-1 flex flex-col justify-center">
-                            <div 
-                                className="flex transition-all duration-500 ease-in-out"
-                                style={{ 
-                                    width: '300%', 
-                                    marginLeft: `-${(step - 1) * 100}%` 
-                                }}
-                            >
-                                {/* Slide 1: Essentials Form */}
-                                <div className="w-1/3 flex-shrink-0 px-1 flex flex-col justify-center text-left">
-                                    <div className="mb-4">
-                                        <span className="text-[9px] uppercase tracking-widest font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100">STEP 1 OF 3</span>
-                                        <h2 className="text-xl font-black text-slate-800 tracking-tight mt-1">
-                                            The Essentials.
-                                        </h2>
-                                        <p className="text-[11px] text-slate-600 leading-relaxed font-semibold mt-0.5">
-                                            Every classmate profile is verified to keep our community safe.
-                                        </p>
-                                    </div>
+                        {/* Interactive Steps views with AnimatePresence */}
+                        <div className="flex-1 flex flex-col justify-start py-2">
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={step}
+                                    initial={{ opacity: 0, x: 12 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -12 }}
+                                    transition={{ duration: 0.25, ease: "easeOut" }}
+                                    className="w-full text-left flex flex-col justify-between"
+                                >
+                                    {step === 1 && (
+                                        <div className="w-full flex flex-col justify-center text-left">
+                                            <div className="mb-4">
+                                                <span className="text-[9px] uppercase tracking-widest font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100">STEP 1 OF 3</span>
+                                                <h2 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight mt-1">
+                                                    The Essentials
+                                                </h2>
+                                                <p className="text-[11px] text-slate-600 leading-relaxed font-semibold mt-0.5">
+                                                    Every classmate profile is verified to keep our community safe.
+                                                </p>
+                                            </div>
 
-                                    <div className="space-y-4 pt-1 w-full text-left">
-                                        <div className="space-y-1.5">
-                                            <div className="flex justify-between items-end px-1">
-                                                <div>
-                                                    <label className="block text-[10px] font-extrabold text-[#0B3D2E] uppercase tracking-widest">Full Name</label>
-                                                    <p className="text-[9px] text-slate-500 font-semibold leading-none mt-1">Enter your real name as officially registered at school.</p>
+                                            <div className="space-y-4 pt-1 w-full text-left">
+                                                <div className="space-y-1.5">
+                                                    <div className="flex justify-between items-end px-1">
+                                                        <div>
+                                                            <label className="block text-[10px] font-extrabold text-[#0B3D2E] uppercase tracking-widest leading-none">Full Name</label>
+                                                            <p className="hidden sm:block text-[9px] text-slate-500 font-semibold leading-none mt-1">Enter your official name registered at school.</p>
+                                                        </div>
+                                                        <span className="text-[8px] text-rose-600 font-bold uppercase shrink-0">Required</span>
+                                                    </div>
+                                                    <div className="relative flex items-center group">
+                                                        <User className="absolute left-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" size={15} />
+                                                        <input 
+                                                            type="text" 
+                                                            required
+                                                            value={formData.fullName}
+                                                            onChange={e => setFormData({ ...formData, fullName: e.target.value })}
+                                                            className="w-full pl-11 pr-4 py-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 border border-slate-300 focus:border-emerald-600 outline-none text-xs text-slate-900 rounded-xl transition-all font-semibold placeholder:text-slate-400"
+                                                            placeholder="Example: Axzel Baril"
+                                                        />
+                                                    </div>
+                                                    <p className="text-[9.5px] leading-snug text-slate-500 font-medium ml-1">
+                                                        So student peers can recognize you during safe zone meetups on campus.
+                                                    </p>
                                                 </div>
-                                                <span className="text-[8px] text-rose-600 font-bold uppercase shrink-0">Required</span>
-                                            </div>
-                                            <div className="relative flex items-center group">
-                                                <User className="absolute left-4 text-slate-500 group-focus-within:text-emerald-600 transition-colors" size={16} />
-                                                <input 
-                                                    type="text" 
-                                                    required
-                                                    value={formData.fullName}
-                                                    onChange={e => setFormData({ ...formData, fullName: e.target.value })}
-                                                    className="w-full pl-11 pr-4 py-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 border border-slate-300 focus:border-emerald-600 outline-none text-xs text-slate-900 rounded-xl transition-all font-semibold placeholder:text-slate-500"
-                                                    placeholder="Example: Axzel Baril"
-                                                />
-                                            </div>
-                                            <p className="text-[9px] text-slate-500 font-medium ml-1">Necessary so classmate peers can recognize you during physical campus meetups.</p>
-                                        </div>
 
-                                        <div className="space-y-1.5">
-                                            <div className="flex justify-between items-end px-1">
-                                                <div>
-                                                    <label className="block text-[10px] font-extrabold text-[#0B3D2E] uppercase tracking-widest">Course & Year</label>
-                                                    <p className="text-[9px] text-slate-500 font-semibold leading-none mt-1">Specify your current major program and study year.</p>
+                                                <div className="space-y-1.5">
+                                                    <div className="flex justify-between items-end px-1">
+                                                        <div>
+                                                            <label className="block text-[10px] font-extrabold text-[#0B3D2E] uppercase tracking-widest leading-none">Course & Year</label>
+                                                            <p className="hidden sm:block text-[9px] text-slate-500 font-semibold leading-none mt-1">Specify your major program and current year.</p>
+                                                        </div>
+                                                        <span className="text-[8px] text-rose-600 font-bold uppercase shrink-0">Required</span>
+                                                    </div>
+                                                    <div className="relative flex items-center group">
+                                                        <GraduationCap className="absolute left-4 text-slate-400 group-focus-within:text-[#10b981] transition-colors" size={15} />
+                                                        <input 
+                                                            type="text" 
+                                                            required
+                                                            value={formData.courseAndYear}
+                                                            onChange={e => setFormData({ ...formData, courseAndYear: e.target.value })}
+                                                            className="w-full pl-11 pr-4 py-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 border border-slate-300 focus:border-emerald-600 outline-none text-xs text-slate-900 rounded-xl transition-all font-semibold placeholder:text-slate-400"
+                                                            placeholder="Example: BS Computer Engineering 3rd Year"
+                                                        />
+                                                    </div>
+                                                    <p className="text-[9.5px] leading-snug text-slate-500 font-medium ml-1">
+                                                        Helps you target your relevant classes and local department market listings.
+                                                    </p>
                                                 </div>
-                                                <span className="text-[8px] text-rose-600 font-bold uppercase shrink-0">Required</span>
-                                            </div>
-                                            <div className="relative flex items-center group">
-                                                <GraduationCap className="absolute left-4 text-slate-500 group-focus-within:text-[#10b981] transition-colors" size={16} />
-                                                <input 
-                                                    type="text" 
-                                                    required
-                                                    value={formData.courseAndYear}
-                                                    onChange={e => setFormData({ ...formData, courseAndYear: e.target.value })}
-                                                    className="w-full pl-11 pr-4 py-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 border border-slate-300 focus:border-emerald-600 outline-none text-xs text-slate-900 rounded-xl transition-all font-semibold placeholder:text-slate-500"
-                                                    placeholder="Example: BS Computer Engineering 3rd Year"
-                                                />
-                                            </div>
-                                            <p className="text-[9px] text-slate-500 font-medium ml-1">Connects you with student peers in your department or similar courses.</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Slide 2: Tell Students About Yourself */}
-                                <div className="w-1/3 flex-shrink-0 px-1 flex flex-col justify-center text-left">
-                                    <div className="mb-4">
-                                        <span className="text-[9px] uppercase tracking-widest font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Step 2 OF 3</span>
-                                        <h2 className="text-xl font-black text-slate-800 tracking-tight mt-1">
-                                            Tell Students About Yourself
-                                        </h2>
-                                        <p className="text-[11px] text-slate-600 leading-relaxed font-semibold mt-0.5">
-                                            Create a short profile introduction so other students know who they are trading with.
-                                        </p>
-                                    </div>
-
-                                    <div className="w-full space-y-3">
-                                        <div className="space-y-1.5">
-                                            <div className="flex justify-between items-center px-1">
-                                                <label className="block text-[10px] font-extrabold text-[#0B3D2E] uppercase tracking-widest">Profile Bio</label>
-                                                <span className="text-[8px] text-slate-500 font-bold uppercase">Optional</span>
-                                            </div>
-                                            <textarea 
-                                                value={formData.bio}
-                                                maxLength={150}
-                                                onChange={e => setFormData({ ...formData, bio: e.target.value.slice(0, 150) })}
-                                                className="w-full h-22 p-4 bg-slate-50 hover:bg-slate-100/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 border border-slate-300 focus:border-emerald-600 outline-none text-xs text-slate-900 rounded-xl transition-all font-semibold resize-none leading-relaxed placeholder:text-slate-500"
-                                                placeholder="Example: Computer Engineering student at PLSP. I sell textbooks, electronics, and school supplies."
-                                            />
-                                            <div className="flex justify-between items-center px-1">
-                                                <p className="text-[9px] text-slate-500 font-semibold leading-tight">2-3 sentences is enough. This helps build trust with other students.</p>
-                                                <span className={cn(
-                                                    "text-[8.5px] font-bold tracking-wider uppercase whitespace-nowrap",
-                                                    formData.bio.length >= 135 ? "text-amber-600" : "text-[#0B3D2E]"
-                                                )}>
-                                                    {formData.bio.length} / 150 characters
-                                                </span>
                                             </div>
                                         </div>
+                                    )}
 
-                                        {/* Tip card */}
-                                        <div className="bg-emerald-50/70 border border-emerald-100/60 p-3 rounded-2xl flex items-start gap-2.5">
-                                            <Sparkles size={14} className="text-[#10b981] mt-0.5 flex-shrink-0 animate-pulse" />
-                                            <p className="text-[10px] text-emerald-900 font-semibold leading-normal">
-                                                Students with completed profiles receive more messages and sell items faster.
-                                            </p>
-                                        </div>
-                                        
-                                        {/* Quick bio filler templates */}
-                                        <div className="space-y-1.5 pt-0.5">
-                                            <p className="text-[9px] uppercase tracking-wider font-extrabold text-[#0B3D2E] ml-1">Tap a template to instant-fill:</p>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {[
-                                                    { emoji: "💻", tag: "Engineering", text: "Computer Engineering student at PLSP. I sell textbooks, electronics, and school supplies." },
-                                                    { emoji: "📚", tag: "Academic", text: "Literature student at PLSP. Selling second-hand textbook guides, novels, and physical notebooks." },
-                                                    { emoji: "🌱", tag: "Dorm Life", text: "First year dorm student looking for handy school supplies, desk lamps, and textbooks." }
-                                                ].map((item, id) => {
-                                                    const isSelected = formData.bio === item.text;
-                                                    return (
-                                                        <button 
-                                                            key={id}
-                                                            type="button"
-                                                            onClick={() => setFormData({ ...formData, bio: item.text })}
-                                                            className={cn(
-                                                                "px-2.5 py-1.5 border text-[9px] font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1",
-                                                                isSelected 
-                                                                    ? "bg-[#0b3d2e] text-white border-[#0b3d2e] shadow-sm scale-102"
-                                                                    : "bg-slate-50 border-slate-300 text-slate-700 hover:bg-emerald-50 hover:border-emerald-500"
-                                                            )}
-                                                        >
-                                                            <span>{item.emoji}</span>
-                                                            <span>{item.tag}</span>
-                                                        </button>
-                                                    );
-                                                })}
+                                    {step === 2 && (
+                                        <div className="w-full flex flex-col justify-center text-left">
+                                            <div className="mb-4">
+                                                <span className="text-[9px] uppercase tracking-widest font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Step 2 OF 3</span>
+                                                <h2 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight mt-1">
+                                                    Tell Students About Yourself
+                                                </h2>
+                                                <p className="text-[11px] text-slate-600 leading-relaxed font-semibold mt-0.5">
+                                                    Create a short profile summary so classmate peers can trade with trust.
+                                                </p>
+                                            </div>
+
+                                            <div className="w-full space-y-3">
+                                                <div className="space-y-1.5">
+                                                    <div className="flex justify-between items-center px-1">
+                                                        <label className="block text-[10px] font-extrabold text-[#0B3D2E] uppercase tracking-widest">Profile Bio</label>
+                                                        <span className="text-[8px] text-slate-400 font-extrabold uppercase bg-slate-100 px-1.5 py-0.5 rounded">Optional</span>
+                                                    </div>
+                                                    <textarea 
+                                                        value={formData.bio}
+                                                        maxLength={150}
+                                                        onChange={e => setFormData({ ...formData, bio: e.target.value.slice(0, 150) })}
+                                                        className="w-full h-20 p-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 border border-slate-300 focus:border-emerald-600 outline-none text-xs text-slate-900 rounded-xl transition-all font-semibold resize-none leading-relaxed placeholder:text-slate-450"
+                                                        placeholder="Example: Computer Engineering student. I trade textbooks, second-hand tech, and campus notes."
+                                                    />
+                                                    <div className="flex justify-between items-center px-1">
+                                                        <p className="text-[9px] text-slate-500 font-medium leading-none">2-3 quick sentences is perfect.</p>
+                                                        <span className={cn(
+                                                            "text-[8.5px] font-bold tracking-wider uppercase whitespace-nowrap",
+                                                            formData.bio.length >= 135 ? "text-amber-600" : "text-[#0B3D2E]"
+                                                        )}>
+                                                            {formData.bio.length} / 150
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Tip card */}
+                                                <div className="bg-emerald-50/70 border border-emerald-100/60 p-3 rounded-2xl flex items-start gap-2.5">
+                                                    <Sparkles size={13} className="text-[#10b981] mt-0.5 flex-shrink-0 animate-pulse" />
+                                                    <p className="text-[10px] text-emerald-950 font-semibold leading-normal">
+                                                        Complete profiles get 3x higher responses and sell items 48h faster.
+                                                    </p>
+                                                </div>
+                                                
+                                                {/* Quick bio filler templates */}
+                                                <div className="space-y-1.5 pt-0.5">
+                                                    <p className="text-[9px] uppercase tracking-wider font-extrabold text-[#0B3D2E] ml-1">Tap a template to autofill:</p>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {[
+                                                            { emoji: "💻", tag: "Engineering", text: "Computer Engineering student at PLSP. I sell textbooks, electronics, and school supplies." },
+                                                            { emoji: "📚", tag: "Academic", text: "Literature student at PLSP. Selling second-hand textbook guides, novels, and physical notebooks." },
+                                                            { emoji: "🌱", tag: "Dorm Life", text: "First year dorm student looking for handy school supplies, desk lamps, and textbooks." }
+                                                        ].map((item, id) => {
+                                                            const isSelected = formData.bio === item.text;
+                                                            return (
+                                                                <button 
+                                                                    key={id}
+                                                                    type="button"
+                                                                    onClick={() => setFormData({ ...formData, bio: item.text })}
+                                                                    className={cn(
+                                                                        "px-2.5 py-1.5 border text-[9px] font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1",
+                                                                        isSelected 
+                                                                            ? "bg-[#0b3d2e] text-white border-[#0b3d2e] shadow-sm"
+                                                                            : "bg-slate-50 border-slate-300 text-slate-700 hover:bg-emerald-50 hover:border-emerald-500"
+                                                                    )}
+                                                                >
+                                                                    <span>{item.emoji}</span>
+                                                                    <span>{item.tag}</span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
+                                    )}
 
-                                {/* Slide 3: Taste Form */}
-                                <div className="w-1/3 flex-shrink-0 px-1 flex flex-col justify-center text-left">
-                                    <div className="mb-4">
-                                        <span className="text-[9px] uppercase tracking-widest font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Step 3 OF 3</span>
-                                        <h2 className="text-xl font-black text-slate-800 tracking-tight mt-1">
-                                            What are your Interests?
-                                        </h2>
-                                        <p className="text-[11px] text-slate-600 leading-relaxed font-semibold mt-0.5">
-                                            Select your primary category preferences to adapt feed alerts.
-                                        </p>
-                                    </div>
+                                    {step === 3 && (
+                                        <div className="w-full flex flex-col justify-center text-left">
+                                            <div className="mb-4">
+                                                <span className="text-[9px] uppercase tracking-widest font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Step 3 OF 3</span>
+                                                <h2 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight mt-1">
+                                                    What are your Interests?
+                                                </h2>
+                                                <p className="text-[11px] text-slate-600 leading-relaxed font-semibold mt-0.5">
+                                                    Select your primary category preferences to adapt feed alerts.
+                                                </p>
+                                            </div>
 
-                                    <div className="space-y-3 w-full">
-                                        <div className="space-y-1">
-                                            <label className="block text-[10px] font-extrabold text-[#0B3D2E] uppercase tracking-widest px-1">Category Preferences</label>
-                                            <p className="text-[9px] text-slate-500 font-semibold px-1">Tap the categories you are interested in buying, selling, or browsing to calibrate your recommendations.</p>
+                                            <div className="space-y-3 w-full">
+                                                <div className="space-y-0.5">
+                                                    <label className="block text-[10px] font-extrabold text-[#0B3D2E] uppercase tracking-widest px-1">Category Preferences</label>
+                                                    <p className="text-[9px] text-slate-500 font-semibold px-1">Tap categories you intend to browse, buy, or sell.</p>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-2 w-full pt-1">
+                                                    {interests.map(interest => {
+                                                        const isSelected = formData.interests.includes(interest);
+                                                        return (
+                                                            <button
+                                                                key={interest}
+                                                                type="button"
+                                                                onClick={() => toggleInterest(interest)}
+                                                                className={cn(
+                                                                    "h-10 px-3 border rounded-xl text-[10.5px] font-extrabold transition-all cursor-pointer flex items-center justify-between",
+                                                                    isSelected
+                                                                        ? "bg-emerald-50 border-emerald-500 text-[#0b3d2e] font-black ring-1 ring-emerald-500"
+                                                                        : "bg-slate-50/50 border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-emerald-300"
+                                                                )}
+                                                            >
+                                                                <span className="uppercase tracking-wider">{interest}</span>
+                                                                {isSelected ? (
+                                                                    <span className="w-4 h-4 bg-emerald-600 text-white rounded-full flex items-center justify-center text-[7.5px] flex-shrink-0">✓</span>
+                                                                ) : (
+                                                                    <span className="w-4 h-4 border border-slate-300 rounded-full flex items-center justify-center flex-shrink-0"></span>
+                                                                )}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
                                         </div>
-
-                                        <div className="grid grid-cols-2 gap-2 w-full pt-1">
-                                            {interests.map(interest => {
-                                                const isSelected = formData.interests.includes(interest);
-                                                return (
-                                                    <button
-                                                        key={interest}
-                                                        type="button"
-                                                        onClick={() => toggleInterest(interest)}
-                                                        className={cn(
-                                                            "h-12 px-3 border rounded-xl text-[11px] font-extrabold transition-all cursor-pointer flex items-center justify-between",
-                                                            isSelected
-                                                                ? "bg-emerald-50 border-emerald-500 text-[#0b3d2e] font-black ring-1 ring-emerald-500"
-                                                                : "bg-slate-50/50 border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-emerald-300"
-                                                        )}
-                                                    >
-                                                        <span className="uppercase tracking-wider">{interest}</span>
-                                                        {isSelected ? (
-                                                            <span className="w-4.5 h-4.5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-[8px]">✓</span>
-                                                        ) : (
-                                                            <span className="w-4.5 h-4.5 border border-slate-300 rounded-full flex items-center justify-center text-[8px]"></span>
-                                                        )}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>                                   </div>
-                                    </div>
-                                </div>
-                            </div>
+                                    )}
+                                </motion.div>
+                            </AnimatePresence>
+                        </div>
 
                         {/* Controls Bottom Navigation bar */}
-                        <div className="mt-6 space-y-3 w-full">
+                        <div className="mt-6 space-y-3 w-full shrink-0">
                             <button 
                                 type="button"
                                 onClick={step === 3 ? handleComplete : handleNext}
@@ -3846,7 +4174,7 @@ const OnboardingPage = () => {
                                     <button 
                                         type="button"
                                         onClick={handleBack}
-                                        className="text-slate-400 hover:text-emerald-800 transition-colors text-xxs font-extrabold uppercase tracking-widest cursor-pointer py-1 block w-full"
+                                        className="text-slate-400 hover:text-emerald-800 transition-colors text-xxs font-extrabold uppercase tracking-widest cursor-pointer py-1.5 block w-full"
                                     >
                                         ← Go back to previous step
                                     </button>
@@ -3855,14 +4183,14 @@ const OnboardingPage = () => {
                         </div>
 
                         {/* Sub-card Trust Badge block */}
-                        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-center gap-2">
+                        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-center gap-2 shrink-0">
                             <ShieldCheck size={14} className="text-[#10b981]" />
-                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Campus Peer Verification Enforced • Safe Zone Trade Only</span>
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider text-center">Verified Peer Exchange • Campus Meetups Only</span>
                         </div>
                     </div>
 
                     {/* Left/Right Balance: visual logo accent decoration on mobile view */}
-                    <div className="mt-6 md:hidden flex flex-col items-center justify-center gap-1.5 z-10 opacity-70">
+                    <div className="mt-6 md:hidden flex flex-col items-center justify-center gap-1.5 z-10 opacity-70 shrink-0">
                         <span className="text-[10px] font-black tracking-widest text-[#4ade80] uppercase">CampusMart Hub</span>
                         <p className="text-[9px] text-white/50 font-medium">Verified student peer exchange network</p>
                     </div>
@@ -4079,13 +4407,16 @@ const NotificationOverlay = () => {
 };
 
 const TransactionsPage = () => {
-    const { transactions, user, updateTransactionStatus } = useApp();
+    const { transactions, user, updateTransactionStatus, orders, updateOrderStatus } = useApp();
     const navigate = useNavigate();
     const [filter, setFilter] = useState<'buying' | 'selling'>('buying');
 
     const filtered = transactions.filter(t => 
         filter === 'buying' ? t.buyerId === user?.id : t.sellerId === user?.id
     );
+
+    const buyingOrders = (orders || []).filter(o => o.buyer_id === user?.id);
+    const sellingOrders = (orders || []).filter(o => o.seller_id === user?.id);
 
     if (!user) return null;
 
@@ -4120,7 +4451,122 @@ const TransactionsPage = () => {
                     </button>
                 </div>
 
+                {/* Direct Meetup Reserve Orders Section */}
+                {filter === 'buying' && buyingOrders.length > 0 && (
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between px-2">
+                            <h2 className="text-xs font-black text-[#166534] uppercase tracking-[0.2em] flex items-center gap-2">
+                                <ShoppingBag size={14} /> Product Buy Reserves ({buyingOrders.length})
+                            </h2>
+                            <span className="text-[10px] font-bold text-text-muted">Meetup Cash Payment Only</span>
+                        </div>
+                        <div className="space-y-4">
+                            {buyingOrders.map(order => (
+                                <div key={order.order_id} className="bg-white rounded-[32px] p-6 border border-border-main/80 shadow-sm hover:shadow-md transition-all space-y-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                                        <div>
+                                            <p className="text-[10px] font-mono text-text-muted">ORDER ID: {order.order_id.slice(0, 8)}...</p>
+                                            <p className="text-[10px] text-text-muted font-medium">Reserved: {new Date(order.created_at).toLocaleString()}</p>
+                                        </div>
+                                        <div className={cn(
+                                            "px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border",
+                                            order.order_status === 'Completed' ? "bg-green-50 text-green-600 border-green-100" :
+                                            order.order_status === 'Cancelled' ? "bg-red-50 text-red-600 border-red-100" :
+                                            order.order_status === 'Confirmed' ? "bg-blue-50 text-blue-600 border-blue-100" :
+                                            "bg-amber-50 text-amber-600 border-amber-100 animate-pulse"
+                                        )}>
+                                            {order.order_status}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex flex-col md:flex-row gap-6">
+                                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                                            <div className="w-20 h-20 rounded-2xl overflow-hidden border border-border-main flex-shrink-0 bg-bg-light">
+                                                {order.product_image ? (
+                                                    <img src={order.product_image} alt={order.product_name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+                                                        <ShoppingBag size={24} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="space-y-1">
+                                                <h3 className="font-extrabold text-text-main text-base leading-tight truncate">
+                                                    {order.product_name}
+                                                </h3>
+                                                <p className="text-text-muted text-xs font-bold">
+                                                    Quantity: <span className="text-text-main font-black">{order.quantity} unit{order.quantity > 1 ? 's' : ''}</span>
+                                                </p>
+                                                <p className="text-brand-primary font-black text-sm">
+                                                    ₱{order.unit_price.toLocaleString()} each • Total: ₱{order.total_price.toLocaleString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex-1 bg-green-50/50 p-4 rounded-2xl border border-green-100/50 space-y-2 text-xs">
+                                            <p className="text-[10px] font-black text-[#166534] uppercase tracking-wider flex items-center gap-1.5 border-b border-green-100 pb-1.5 mb-1.5">
+                                                <MapPin size={12} className="text-brand-primary" /> Meetup Location Scheduled
+                                            </p>
+                                            <p className="font-black text-text-main leading-snug">{order.meetup_location}</p>
+                                            <p className="text-text-muted font-bold">
+                                                Scheduled Date & Time: <span className="text-text-main font-black">{order.meetup_date} @ {order.meetup_time}</span>
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+                                        <div className="flex items-center gap-4">
+                                            <p className="font-bold text-text-muted">
+                                                Seller: <span className="text-text-main font-black">{order.seller_name || 'Verified Student Seller'}</span>
+                                            </p>
+                                            <a href={`tel:${order.contact_number}`} className="flex items-center gap-1 text-brand-primary font-black hover:underline">
+                                                <Phone size={12} /> Call ({order.contact_number})
+                                            </a>
+                                        </div>
+                                        {order.buyer_message && (
+                                            <div className="mt-2 w-full text-xs text-text-muted italic bg-bg-light p-3 rounded-xl border border-border-main/50">
+                                                Your message: "{order.buyer_message}"
+                                            </div>
+                                        )}
+                                        {order.order_status === 'Pending' && (
+                                            <div className="w-full flex justify-end">
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm("Are you sure you want to cancel this reserve order?")) {
+                                                            updateOrderStatus(order.order_id, 'Cancelled');
+                                                        }
+                                                    }}
+                                                    className="px-4 py-2 text-xs font-black uppercase tracking-wider border border-red-200 text-red-500 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                                                >
+                                                    Cancel Request
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {filter === 'selling' && sellingOrders.length > 0 && (
+                    <div className="space-y-4 mb-6">
+                        <div className="p-5 bg-gradient-to-r from-emerald-50 to-[#166534]/5 rounded-[32px] border border-emerald-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div className="space-y-1">
+                                <h3 className="text-sm font-black text-[#166534] uppercase tracking-wide">You have {sellingOrders.length} incoming orders!</h3>
+                                <p className="text-xs font-medium text-emerald-800 leading-snug">To update these reserve requests and manage meetups, visit your dedicated dashboard.</p>
+                            </div>
+                            <Link to="/dashboard" className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-xs font-black tracking-wider uppercase hover:opacity-95 transition-all text-center">Go to Seller Dashboard</Link>
+                        </div>
+                    </div>
+                )}
+
                 <div className="space-y-4">
+                    <div className="flex items-center px-2">
+                        <h2 className="text-xs font-black text-text-muted uppercase tracking-[0.2em] flex items-center gap-2">
+                            <Clock size={14} /> Classic Chat Inquiries ({filtered.length})
+                        </h2>
+                    </div>
                     {filtered.length === 0 ? (
                         <div className="py-20 text-center space-y-4 bg-white rounded-[40px] border border-border-main border-dashed">
                             <div className="w-20 h-20 bg-bg-light rounded-[32px] mx-auto flex items-center justify-center text-text-muted/30">

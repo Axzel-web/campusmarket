@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, ChevronRight, X, Sparkles, Hand } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Compass } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface Step {
@@ -122,32 +122,6 @@ export const SpotlightTutorial: React.FC<SpotlightTutorialProps> = ({
     return style;
   };
 
-  const getHandPosition = () => {
-    if (!targetRect) return null;
-    const { left, top, width: tWidth, height: tHeight } = targetRect;
-    const { width: wWidth, height: wHeight } = windowSize;
-
-    // Position hand based on where tooltip is NOT
-    const tooltipStyle = getTooltipPosition();
-    const isTooltipBelow = (tooltipStyle.top as number) > top;
-
-    if (isTooltipBelow) {
-      return {
-        left: left + tWidth / 2 - 20,
-        top: top - 40,
-        rotate: 180
-      };
-    } else {
-      return {
-        left: left + tWidth / 2 - 20,
-        top: top + tHeight + 10,
-        rotate: 0
-      };
-    }
-  };
-
-  const handPos = getHandPosition();
-
   return (
     <div 
       ref={containerRef}
@@ -156,87 +130,79 @@ export const SpotlightTutorial: React.FC<SpotlightTutorialProps> = ({
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
         <motion.path
           d={getSpotlightPath()}
-          fill="rgba(0, 0, 0, 0.75)"
+          fill="rgba(11, 61, 46, 0.45)"
           fillRule="evenodd"
           initial={false}
           animate={{ d: getSpotlightPath() }}
           transition={{ type: 'spring', stiffness: 150, damping: 25 }}
-          className="pointer-events-auto cursor-default"
+          className="pointer-events-auto cursor-default backdrop-blur-[2px]"
         />
       </svg>
 
       <AnimatePresence mode="wait">
         <motion.div
           key={currentStepIndex}
-          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          exit={{ opacity: 0, scale: 0.95, y: 15 }}
           style={getTooltipPosition()}
           className="absolute w-full max-w-[320px] pointer-events-auto"
         >
-          <div className="flex flex-col gap-4">
-            {/* Guide Avatar */}
-            <motion.div 
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="flex items-center gap-3 ml-2"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-brand-primary flex items-center justify-center text-white shadow-xl shadow-brand-primary/20 ring-4 ring-white/10">
-                <Sparkles size={24} className="animate-pulse" />
-              </div>
-              <div className="bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20">
-                <span className="text-[10px] font-black text-white uppercase tracking-wider">Campus Guide</span>
-              </div>
-            </motion.div>
-
+          <div className="flex flex-col gap-3">
             {/* Speech Bubble Tooltip */}
-            <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl border border-border-main relative">
+            <div className="bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 relative">
               <div 
                 className={cn(
-                  "absolute left-8 w-6 h-6 bg-white border-l border-t border-border-main rotate-45",
-                  targetRect && (getTooltipPosition().top as number) > targetRect.top ? "-top-3" : "-bottom-3 rotate-[225deg]"
+                  "absolute left-8 w-4 h-4 bg-white border-l border-t border-slate-100 rotate-45",
+                  targetRect && (getTooltipPosition().top as number) > targetRect.top ? "-top-2" : "-bottom-2 rotate-[225deg]"
                 )}
               />
               
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-[10px] font-black text-brand-deep uppercase tracking-[0.2em]">
-                  {currentStepIndex + 1} / {steps.length}
-                </span>
-                <button 
-                  onClick={onSkip}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-light transition-colors text-text-muted hover:text-text-main"
-                >
-                  <X size={18} />
-                </button>
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#0B3D2E]/10 rounded-full text-[10px] font-black text-[#0B3D2E] uppercase tracking-wider">
+                  <Compass size={12} className="animate-spin-slow" />
+                  <span>Campus Guide</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {currentStepIndex + 1} of {steps.length}
+                  </span>
+                  <button 
+                    onClick={onSkip}
+                    className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors text-slate-400 hover:text-slate-600 cursor-pointer"
+                    title="Close"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
               
-              <h3 className="text-xl font-black text-text-main mb-2 leading-tight">{currentStep.title}</h3>
-              <p className="text-sm text-text-muted leading-relaxed font-medium mb-8">{currentStep.content}</p>
+              <h3 className="text-base font-extrabold text-slate-800 mb-1.5 leading-tight">{currentStep.title}</h3>
+              <p className="text-xs text-slate-500 leading-relaxed font-semibold mb-6">{currentStep.content}</p>
               
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between border-t border-slate-100 pt-4">
                 <button 
                   onClick={onSkip}
-                  className="text-[11px] font-black text-text-muted hover:text-brand-deep transition-colors uppercase tracking-widest px-2"
+                  className="text-[10.5px] font-black text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-wider cursor-pointer"
                 >
                   Skip
                 </button>
                 
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   {currentStepIndex > 0 && (
                     <button 
                       onClick={handleBack}
-                      className="w-11 h-11 flex items-center justify-center rounded-2xl border border-border-main hover:bg-bg-light hover:border-text-main transition-all text-text-main"
+                      className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all text-slate-600 cursor-pointer"
                     >
-                      <ChevronLeft size={20} />
+                      <ChevronLeft size={16} />
                     </button>
                   )}
                   <button 
                     onClick={handleNext}
-                    className="flex items-center gap-2 px-6 h-11 bg-brand-primary text-white rounded-2xl text-xs font-black shadow-xl shadow-brand-primary/30 hover:scale-[1.05] active:scale-95 transition-all uppercase tracking-wider"
+                    className="flex items-center gap-1 px-4 h-9 bg-[#0B3D2E] hover:bg-[#072d21] text-white rounded-xl text-xs font-black transition-all uppercase tracking-wider cursor-pointer"
                   >
-                    {currentStepIndex === steps.length - 1 ? 'Got it!' : 'Next'}
-                    <ChevronRight size={16} />
+                    {currentStepIndex === steps.length - 1 ? 'Finish' : 'Next'}
+                    <ChevronRight size={14} />
                   </button>
                 </div>
               </div>
@@ -244,35 +210,6 @@ export const SpotlightTutorial: React.FC<SpotlightTutorialProps> = ({
           </div>
         </motion.div>
       </AnimatePresence>
-
-      {/* Animated Pointing Hand */}
-      {handPos && (
-        <motion.div
-          key={`hand-${currentStepIndex}`}
-          initial={{ opacity: 0, scale: 0.5, ...handPos }}
-          animate={{ 
-            opacity: 1, 
-            scale: 1,
-            y: handPos.rotate === 0 ? [0, 15, 0] : [0, -15, 0]
-          }}
-          transition={{
-            opacity: { duration: 0.2 },
-            scale: { duration: 0.2 },
-            y: { repeat: Infinity, duration: 1.5, ease: "easeInOut" }
-          }}
-          style={{
-            position: 'absolute',
-            left: handPos.left,
-            top: handPos.top,
-            transform: `rotate(${handPos.rotate}deg)`,
-            color: '#ff4b4b',
-            filter: 'drop-shadow(0 0 10px rgba(255, 75, 75, 0.3))'
-          }}
-          className="pointer-events-none"
-        >
-          <Hand size={40} fill="currentColor" strokeWidth={1} />
-        </motion.div>
-      )}
     </div>
   );
 };

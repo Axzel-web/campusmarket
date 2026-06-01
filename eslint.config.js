@@ -3,6 +3,9 @@ import tseslint from 'typescript-eslint';
 
 export default [
   {
+    ignores: ["android/**", "dist/**", "node_modules/**"]
+  },
+  {
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parser: tseslint.parser,
