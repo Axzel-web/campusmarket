@@ -27,33 +27,59 @@ Try the latest Android version of CampusMart:
 ## Features
 
 ### User Management
-- User Registration and Authentication
-- Secure Login and Account Management
-- Profile Management
+
+* User Registration and Authentication
+* Secure Login and Account Management
+* Profile Management and Customization
+* User Onboarding Experience
+* Interactive App Tutorial
+
+### Seller Verification
+
+* Student Seller Verification System
+* Verification Status Tracking
+* Verification Reset and Resubmission
 
 ### Marketplace Features
-- Product Listing and Management
-- Product Search and Filtering
-- Product Categories
-- Marketplace Browsing
+
+* Product Listing and Management
+* Product Search and Discovery
+* Product Categories and Organization
+* Marketplace Browsing
+* Product Purchasing System
 
 ### Communication
-- Real-time Chat Between Buyers and Sellers
-- Instant Messaging for Product Inquiries
+
+* Real-Time Chat Between Buyers and Sellers
+* Instant Messaging for Product Inquiries and Transactions
 
 ### Transaction Management
-- Secure Checkout Process
-- Order Recording and Management
-- Seller Dashboard for Monitoring Listings and Sales
+
+* Order Placement and Processing
+* Order Tracking and Monitoring
+* Order Cancellation
+* Purchase History Management
+* Seller Dashboard for Monitoring Listings and Sales
+* Profit Monitoring with 5% Platform Fee Tracking
 
 ### Mobile Support
-- Responsive Web Interface
-- Android Mobile Application
+
+* Responsive Web Interface
+* Android Mobile Application
+* Mobile-Friendly User Experience
+
+### Platform Benefits
+
+* Secure and Trusted Campus Marketplace
+* Student Entrepreneurship Support
+* Efficient Buyer-Seller Interaction
+* Centralized Campus Trading Platform
+* 
 
 ## Tech Stack
 
 **Frontend:** React.js, HTML5, CSS3, JavaScript  
-**Backend & Database:** Firebase Authentication, Firestore, Firebase Storage  
+**Backend & Database:** Firebase Authentication, Firestore, Supabase Storage  
 **Deployment:** Vercel  
 **Version Control:** Git & GitHub
 
