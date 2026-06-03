@@ -118,11 +118,19 @@ service cloud.firestore {
              (!('createdAt' in data) || data.createdAt == (resource == null ? request.time : existing().createdAt));
     }
 
+    function isValidOrder(data) {
+      return (resource != null || data.keys().hasAll(['order_id', 'buyer_id', 'seller_id', 'product_id', 'product_name', 'product_image', 'quantity', 'unit_price', 'total_price', 'contact_number', 'meetup_location', 'order_status', 'created_at'])) &&
+             (!('buyer_id' in data) || resource == null || data.buyer_id == existing().buyer_id) &&
+             (!('seller_id' in data) || resource == null || data.seller_id == existing().seller_id) &&
+             (resource != null || !('buyer_id' in data) || data.buyer_id == request.auth.uid) &&
+             (!('order_status' in data) || data.order_status in ['Pending', 'Confirmed', 'Completed', 'Cancelled']);
+    }
+
     // --- 3. Collection Rules ---
 
     match /users/{userId} {
       allow get: if isSignedIn();
-      allow list: if false; // No bulk user scanning
+      allow list: if request.auth.uid == "mp3cXxRdbycE2ffhXwmC2kblZYF2";
       
       allow create: if isOwner(userId) && 
                       hasRequiredProfileFields(incoming()) &&
@@ -130,23 +138,40 @@ service cloud.firestore {
                       incoming().isVerified == false && // Cannot self-verify
                       incoming().role == 'buyer';      // Default role
       
-      allow update: if isOwner(userId) && 
+      allow update: if (isOwner(userId) && 
                       isValidUserProfileSchema(incoming()) &&
                       (!('email' in incoming()) || incoming().email == existing().email) &&
                       (isDeveloper() || (
                         (!('role' in incoming()) || incoming().role == existing().role) &&
                         (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified)
                       )) &&
-                      (!('createdAt' in incoming()) || incoming().createdAt == existing().createdAt);
+                      (!('createdAt' in incoming()) || incoming().createdAt == existing().createdAt)) ||
+                      (request.auth.uid == "mp3cXxRdbycE2ffhXwmC2kblZYF2" && isValidUserProfileSchema(incoming()));
     }
 
     match /users/{userId}/favorites/{listingId} {
       allow read, write: if isOwner(userId);
     }
 
+    match /users/{userId}/files/{fileId} {
+      allow read, write: if isOwner(userId);
+      allow read: if request.auth.uid == "mp3cXxRdbycE2ffhXwmC2kblZYF2";
+      allow list: if request.auth.uid == "mp3cXxRdbycE2ffhXwmC2kblZYF2";
+    }
+
+    match /files/{fileId} {
+      allow read, write: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow read: if request.auth.uid == "mp3cXxRdbycE2ffhXwmC2kblZYF2";
+      allow list: if request.auth.uid == "mp3cXxRdbycE2ffhXwmC2kblZYF2";
+    }
+
     match /sellerApplications/{userId} {
-      allow get: if isOwner(userId);
-      allow create, update: if isOwner(userId) && isValidSellerApplication(incoming());
+      allow get: if isOwner(userId) || request.auth.uid == "mp3cXxRdbycE2ffhXwmC2kblZYF2";
+      allow list: if request.auth.uid == "mp3cXxRdbycE2ffhXwmC2kblZYF2";
+      allow create: if isOwner(userId) && isValidSellerApplication(incoming());
+      allow update: if (isOwner(userId) && isValidSellerApplication(incoming())) ||
+                      (request.auth.uid == "mp3cXxRdbycE2ffhXwmC2kblZYF2");
     }
 
     match /listings/{listingId} {
@@ -219,6 +244,17 @@ service cloud.firestore {
                       (request.auth.uid == existing().sellerId && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
                       // Either can cancel a pending one
                       (existing().status == 'pending' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) && incoming().status == 'cancelled')
+                    );
+    }
+
+    match /orders/{orderId} {
+      allow read, list: if isSignedIn() && (resource.data.buyer_id == request.auth.uid || resource.data.seller_id == request.auth.uid);
+      allow create: if isSignedIn() && incoming().buyer_id == request.auth.uid && isValidOrder(incoming());
+      allow update: if isSignedIn() && (resource.data.buyer_id == request.auth.uid || resource.data.seller_id == request.auth.uid) && isValidOrder(incoming()) && (
+                      // Only seller can confirm or mark completed
+                      (request.auth.uid == existing().seller_id && incoming().diff(existing()).affectedKeys().hasOnly(['order_status'])) ||
+                      // Either buyer or seller can cancel a pending/confirmed order
+                      (incoming().order_status == 'Cancelled' && incoming().diff(existing()).affectedKeys().hasOnly(['order_status']))
                     );
     }
   }

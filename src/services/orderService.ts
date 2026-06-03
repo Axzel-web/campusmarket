@@ -21,7 +21,9 @@ export interface SupabaseOrder {
   created_at: string;
   // Extras to avoid extra queries
   buyer_name?: string;
+  buyer_email?: string;
   seller_name?: string;
+  seller_email?: string;
 }
 
 /**

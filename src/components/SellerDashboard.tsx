@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Star, 
@@ -19,8 +19,22 @@ import {
   CheckCircle2,
   Trash2,
   Package,
-  Plus
+  Plus,
+  Upload,
+  FileIcon
 } from 'lucide-react';
+import { 
+  collection, 
+  onSnapshot, 
+  addDoc, 
+  query, 
+  orderBy, 
+  serverTimestamp, 
+  deleteDoc, 
+  doc 
+} from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Review, Listing } from '../types';
 import { cn } from '../lib/utils';
@@ -54,7 +68,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
   onUpdateOrderStatus,
   isSupabaseConnected = false
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'reviews'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'reviews' | 'files'>('products');
   const [searchTerm, setSearchTerm] = useState('');
   const [ratingFilter, setRatingFilter] = useState<number | 'all'>('all');
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
@@ -62,6 +76,79 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Users uploaded files state & listeners
+  const [userFiles, setUserFiles] = useState<any[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'files' || !user.id) return;
+
+    const filesRef = collection(db, 'users', user.id, 'files');
+    const q = query(filesRef, orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      setUserFiles(list);
+    }, (error) => {
+      console.error("Error fetching files with ordering:", error);
+      // Fallback in case firestore composite index is generating
+      const fallbackUnsubscribe = onSnapshot(filesRef, (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((doc) => {
+          list.push({ id: doc.id, ...doc.data() });
+        });
+        // Client-side sort fallback
+        list.sort((a,b) => (b.createdAt?.toMillis ? b.createdAt.toMillis() : 0) - (a.createdAt?.toMillis ? a.createdAt.toMillis() : 0));
+        setUserFiles(list);
+      });
+      return fallbackUnsubscribe;
+    });
+
+    return unsubscribe;
+  }, [activeTab, user.id]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    try {
+      // 1. Upload to Storage
+      const storageRef = ref(storage, `users/${user.id}/files/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+
+      // 2. Save metadata to Firestore
+      await addDoc(collection(db, 'users', user.id, 'files'), {
+        userId: user.id,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        url: url,
+        createdAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.error("Storage upload or Firestore write failed:", err);
+      alert("Uh oh! Failed to save the file. Check connection.");
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleFileDelete = async (fileId: string) => {
+    if (!window.confirm("Are you sure you want to delete this file permanent?")) return;
+
+    try {
+      await deleteDoc(doc(db, 'users', user.id, 'files', fileId));
+    } catch (err) {
+      console.error("Failed to delete file entry:", err);
+      alert("Failed to delete file database entry.");
+    }
+  };
 
   // Seller Listings (My Products)
   const myListings = useMemo(() => {
@@ -337,6 +424,15 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
           >
             <Star size={16} /> Manage Reviews
           </button>
+          <button 
+            onClick={() => setActiveTab('files')}
+            className={cn(
+              "flex-1 sm:flex-initial px-4 sm:px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 whitespace-nowrap",
+              activeTab === 'files' ? "bg-brand-primary text-white shadow-lg shadow-brand-primary/20" : "text-text-muted hover:text-text-main"
+            )}
+          >
+            <FileText size={16} /> My Storage Files
+          </button>
         </div>
 
         {activeTab === 'products' ? (
@@ -521,6 +617,14 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
                         <p className="font-black text-text-main flex items-center gap-1.5">
                           Buyer: <span className="font-bold text-text-muted">{order.buyer_id === user.id ? 'You (Self-Purchase)' : (order.buyer_name || 'Student Buyer')}</span>
                         </p>
+                        {order.buyer_email && (
+                          <div className="flex items-center gap-1 text-text-muted font-bold">
+                            <span className="font-black text-text-main">Email:</span>
+                            <a href={`mailto:${order.buyer_email}`} className="hover:text-brand-primary hover:underline">
+                              {order.buyer_email}
+                            </a>
+                          </div>
+                        )}
                         <a 
                           href={`tel:${order.contact_number}`} 
                           className="flex items-center gap-1 text-brand-primary font-black hover:underline"
@@ -592,7 +696,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === 'reviews' ? (
           <div className="space-y-6">
             {/* Filters Section */}
             <div className="bg-white rounded-[28px] p-4 sm:p-6 border border-border-main/70 shadow-sm space-y-4">
@@ -781,6 +885,104 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
                         )}
                       </div>
                     </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Files Management Tab */
+          <div className="space-y-6">
+            <div className="bg-white rounded-[32px] p-6 sm:p-8 border border-border-main/70 shadow-sm text-left">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-gray-100 pb-6 mb-6">
+                <div>
+                  <h3 className="text-lg font-black text-text-main flex items-center gap-2">
+                    <FileIcon className="text-[#166534]" size={22} />
+                    My Storage Files Locker
+                  </h3>
+                  <p className="text-xs text-text-muted mt-1">
+                    Store project PDFs, school assignments, reference papers, and verification sheets securely.
+                  </p>
+                </div>
+                
+                <label className={cn(
+                  "flex items-center justify-center gap-2 px-5 py-3 h-fit text-white rounded-xl text-xs font-black shadow-lg shadow-brand-primary/20 bg-[#166534] hover:opacity-95 transition-all cursor-pointer select-none",
+                  uploadingFile ? "opacity-50 pointer-events-none" : ""
+                )}>
+                  <Upload size={16} />
+                  {uploadingFile ? "Uploading File..." : "Upload New File"}
+                  <input 
+                    type="file" 
+                    onChange={handleFileUpload} 
+                    disabled={uploadingFile}
+                    className="hidden" 
+                  />
+                </label>
+              </div>
+
+              {uploadingFile && (
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200/50 rounded-2xl flex items-center gap-3 text-amber-800 text-xs font-bold animate-pulse">
+                  <div className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+                  Uploading and indexing file in Firestore secure database...
+                </div>
+              )}
+
+              {userFiles.length === 0 ? (
+                <div className="py-16 text-center border-2 border-dashed border-gray-150 rounded-3xl bg-bg-light/20">
+                  <FileIcon className="mx-auto text-[#166534] opacity-20 mb-3" size={56} />
+                  <h4 className="text-base font-extrabold text-text-main mb-1">Your File Storage is Empty</h4>
+                  <p className="text-xs text-text-muted max-w-sm mx-auto font-medium mb-6">
+                    Students can upload study guides, syllabus documents, or media sheets.
+                  </p>
+                  <label className="px-6 py-2.5 bg-bg-light hover:bg-white text-text-main hover:text-[#166534] border border-border-main hover:border-[#166534]/45 rounded-xl font-bold text-xs transition-all cursor-pointer inline-block">
+                    Select File to Upload
+                    <input type="file" onChange={handleFileUpload} className="hidden" />
+                  </label>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {userFiles.map((file) => (
+                    <div 
+                      key={file.id}
+                      className="bg-bg-light/40 hover:bg-bg-light/80 p-4 border border-border-main rounded-2xl flex items-center justify-between gap-4 transition-all"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-white border border-border-main flex items-center justify-center text-[#166534] flex-shrink-0 shadow-sm">
+                          <FileIcon size={18} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-text-main truncate" title={file.name}>
+                            {file.name}
+                          </p>
+                          <p className="text-[10px] text-text-muted font-bold tracking-wider mt-0.5">
+                            {file.size ? (file.size / 1024 > 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`) : "No size stated"}
+                            {" • "}
+                            {file.createdAt ? (new Date(file.createdAt.toMillis ? file.createdAt.toMillis() : file.createdAt).toLocaleDateString()) : "Just now"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <a 
+                          href={file.url}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="w-8 h-8 rounded-lg bg-white hover:bg-[#166534]/5 border border-border-main text-[#166534] flex items-center justify-center transition-all cursor-pointer"
+                          title="View / Download"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </a>
+                        <button 
+                          onClick={() => handleFileDelete(file.id)}
+                          className="w-8 h-8 rounded-lg bg-white hover:bg-rose-50 border border-border-main text-rose-500 hover:text-rose-600 flex items-center justify-center transition-all cursor-pointer"
+                          title="Delete File"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

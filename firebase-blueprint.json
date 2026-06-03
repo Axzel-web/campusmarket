@@ -123,6 +123,47 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["listingId", "listingTitle", "buyerId", "sellerId", "amount", "status", "createdAt"]
+    },
+    "FileRecord": {
+      "title": "Uploaded File",
+      "description": "A metadata document of an uploaded file",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "size": { "type": "number" },
+        "type": { "type": "string" },
+        "url": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "size", "type", "url", "createdAt"]
+    },
+    "Order": {
+      "title": "Order Record",
+      "description": "A record of a successful purchase reserve or trade order",
+      "type": "object",
+      "properties": {
+        "order_id": { "type": "string" },
+        "buyer_id": { "type": "string" },
+        "seller_id": { "type": "string" },
+        "product_id": { "type": "string" },
+        "product_name": { "type": "string" },
+        "product_image": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit_price": { "type": "number" },
+        "total_price": { "type": "number" },
+        "contact_number": { "type": "string" },
+        "meetup_location": { "type": "string" },
+        "meetup_date": { "type": "string" },
+        "meetup_time": { "type": "string" },
+        "buyer_message": { "type": "string" },
+        "payment_method": { "type": "string" },
+        "order_status": { "type": "string", "enum": ["Pending", "Confirmed", "Completed", "Cancelled"] },
+        "created_at": { "type": "string" },
+        "buyer_name": { "type": "string" },
+        "seller_name": { "type": "string" }
+      },
+      "required": ["order_id", "buyer_id", "seller_id", "product_id", "product_name", "quantity", "unit_price", "total_price", "contact_number", "meetup_location", "order_status", "created_at"]
     }
   },
   "firestore": {
@@ -133,6 +174,14 @@
     "/users/{userId}/favorites/{listingId}": {
       "schema": "Favorite",
       "description": "User favorites"
+    },
+    "/users/{userId}/files/{fileId}": {
+      "schema": "FileRecord",
+      "description": "User uploaded files metadata"
+    },
+    "/files/{fileId}": {
+      "schema": "FileRecord",
+      "description": "Root uploaded files metadata index"
     },
     "/sellerApplications/{userId}": {
       "schema": "SellerApplication",
@@ -164,6 +213,10 @@
     "/transactions/{transactionId}": {
       "schema": "Transaction",
       "description": "Purchase and sales records"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Marketplace list of reserve and trade orders"
     }
   }
 }

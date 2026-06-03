@@ -54,6 +54,7 @@ import { generateListingDetails } from './services/geminiService';
 import { uploadAvatar, uploadStudentId, syncUserProfileToSupabase } from './services/userService';
 import LandingPage from './components/LandingPage';
 import { SellerDashboard } from './components/SellerDashboard';
+import { AdminDashboard } from './components/AdminDashboard';
 import { LoadingAnimation } from './components/LoadingAnimation';
 import { AboutPage } from './components/AboutPage';
 import { ContactPage } from './components/ContactPage';
@@ -948,7 +949,12 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  if (user) return <Navigate to="/market" replace />;
+  if (user) {
+    if (user.id === 'mp3cXxRdbycE2ffhXwmC2kblZYF2') {
+      return <Navigate to="/dashboard" replace />;
+    }
+    return <Navigate to="/market" replace />;
+  }
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -983,7 +989,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen md:h-screen w-full bg-slate-50 md:bg-[#08231a] relative flex items-center justify-center p-0 md:p-4 lg:p-8 font-sans overflow-y-auto md:overflow-hidden select-none">
+    <div className="min-h-screen w-full bg-slate-50 md:bg-[#08231a] relative flex items-center justify-center p-0 md:p-4 lg:p-8 font-sans overflow-y-auto select-none md:py-12">
       {/* Visual background decorations in screenshot style - light slates on mobile, emerald on desktop */}
       <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1.5px,transparent_1.5px)] md:bg-[radial-gradient(#14532d_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-50 md:opacity-40"></div>
       
@@ -1007,7 +1013,7 @@ const LoginPage = () => {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: "easeOut" }}
-        className="relative w-full h-fit md:h-[640px] md:max-h-[90vh] md:max-w-[1024px] bg-white md:bg-[#0E3D2F]/10 md:backdrop-blur-md md:rounded-3xl md:border md:border-white/[0.08] md:shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col md:flex-row overflow-hidden z-10"
+        className="relative w-full h-fit md:min-h-[580px] md:max-w-[1024px] bg-white md:bg-[#0E3D2F]/10 md:backdrop-blur-md md:rounded-3xl md:border md:border-white/[0.08] md:shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col md:flex-row overflow-hidden z-10"
       >
         {/* Left Hand Side: Banner display and branding (Visible on desktop only) */}
         <div className="hidden md:flex md:w-[45%] bg-white flex-col justify-between p-8 relative overflow-hidden select-none border-r border-[#14532D]/10">
@@ -1052,7 +1058,7 @@ const LoginPage = () => {
         </div>
 
         {/* Right Hand Side: Interactive input form. Adapts fully to white on mobile, deep green on desktop */}
-        <div className="w-full md:w-[55%] bg-white md:bg-gradient-to-br md:from-[#0B3D2E] md:via-[#0d4f3b] md:to-[#14532D] flex flex-col justify-between p-4 sm:p-6 md:p-8 relative overflow-y-auto md:overflow-hidden select-none h-fit md:h-full">
+        <div className="w-full md:w-[55%] bg-white md:bg-gradient-to-br md:from-[#0B3D2E] md:via-[#0d4f3b] md:to-[#14532D] flex flex-col justify-between p-4 sm:p-6 md:p-8 relative overflow-y-auto select-none h-fit md:h-auto md:min-h-[580px]">
           {/* Mobile Back Button removed for direct-login mobile experience */}
 
           {/* Mobile Logo Block - Visible at top on mobile only to match the phone mockup layout */}
@@ -2667,7 +2673,7 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     return unsubscribe;
   }, [user]);
 
-  // Sync Supabase Orders
+  // Sync Firestore and Supabase Orders
   useEffect(() => {
     if (!user) {
       setOrders([]);
@@ -2675,82 +2681,116 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     let active = true;
-    let subscription: any = null;
+    let supabaseSubscription: any = null;
+    const firestoreBuyerMap = new Map<string, SupabaseOrder>();
+    const firestoreSellerMap = new Map<string, SupabaseOrder>();
+    let supabaseOrders: SupabaseOrder[] = [];
 
-    const loadOrders = async () => {
+    const updateAndMergeAllOrders = () => {
+      if (!active) return;
+      const firestoreOrders = [
+        ...firestoreBuyerMap.values(),
+        ...firestoreSellerMap.values()
+      ];
+
+      // Read fallback local storage orders as well
+      let localOrders: SupabaseOrder[] = [];
       try {
-        if (!supabase) {
-          // Fallback to localStorage if Supabase keys aren't set
-          const stored = localStorage.getItem(`orders_${user.id}`);
-          if (stored && active) {
-            setOrders(JSON.parse(stored));
-          }
-          return;
-        }
-
-        let buyerRes: SupabaseOrder[] = [];
-        let sellerRes: SupabaseOrder[] = [];
-
-        try {
-          const [buyer, seller] = await Promise.all([
-            fetchBuyerOrders(user.id),
-            fetchSellerOrders(user.id)
-          ]);
-          buyerRes = buyer || [];
-          sellerRes = seller || [];
-        } catch (dbErr) {
-          console.warn("Supabase orders load failed, probably missing 'orders' table. Using local storage fallback:", dbErr);
-        }
-
-        if (!active) return;
-
-        // Merge both Supabase database results (if any succeed) with localStorage items as backups
         const stored = localStorage.getItem(`orders_${user.id}`);
-        const localOrders: SupabaseOrder[] = stored ? JSON.parse(stored) : [];
+        if (stored) {
+          localOrders = JSON.parse(stored);
+        }
+      } catch (err) {
+        console.warn("Could not read local orders:", err);
+      }
 
-        const mergedOrders = [...buyerRes, ...sellerRes, ...localOrders];
-        // Deduplicate and sort descending by created_at
-        const uniqueOrders = mergedOrders.filter((item, index, self) =>
-          self.findIndex(t => t.order_id === item.order_id) === index
-        );
-        uniqueOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        setOrders(uniqueOrders);
+      // Merge all sources: Firestore, Supabase, Local Storage
+      const allOrders = [...firestoreOrders, ...supabaseOrders, ...localOrders];
 
-        // Set up Realtime subscription
-        subscription = subscribeToUserOrders(user.id, (payload) => {
+      // Deduplicate by order_id
+      const uniqueOrders = allOrders.filter((item, index, self) =>
+        self.findIndex(t => t.order_id === item.order_id) === index
+      );
+
+      // Sort by created_at descending
+      uniqueOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setOrders(uniqueOrders);
+    };
+
+    // 1. Subscribe to Firestore orders where buyer_id === user.id
+    const firestoreBuyerQ = query(collection(db, 'orders'), where('buyer_id', '==', user.id));
+    const unsubscribeFirestoreBuyer = onSnapshot(firestoreBuyerQ, (snapshot) => {
+      snapshot.forEach((doc) => {
+        firestoreBuyerMap.set(doc.id, doc.data() as SupabaseOrder);
+      });
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'removed') {
+          firestoreBuyerMap.delete(change.doc.id);
+        }
+      });
+      updateAndMergeAllOrders();
+    }, (error) => {
+      console.warn("Could not fetch Firestore buyer orders:", error);
+    });
+
+    // 2. Subscribe to Firestore orders where seller_id === user.id
+    const firestoreSellerQ = query(collection(db, 'orders'), where('seller_id', '==', user.id));
+    const unsubscribeFirestoreSeller = onSnapshot(firestoreSellerQ, (snapshot) => {
+      snapshot.forEach((doc) => {
+        firestoreSellerMap.set(doc.id, doc.data() as SupabaseOrder);
+      });
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'removed') {
+          firestoreSellerMap.delete(change.doc.id);
+        }
+      });
+      updateAndMergeAllOrders();
+    }, (error) => {
+      console.warn("Could not fetch Firestore seller orders:", error);
+    });
+
+    // 3. Load from Supabase (if connected)
+    const loadSupabaseOrders = async () => {
+      if (!supabase) return;
+      try {
+        const [buyer, seller] = await Promise.all([
+          fetchBuyerOrders(user.id),
+          fetchSellerOrders(user.id)
+        ]);
+        if (!active) return;
+        supabaseOrders = [...(buyer || []), ...(seller || [])];
+        updateAndMergeAllOrders();
+
+        // Subscribe to real-time additions via Supabase
+        supabaseSubscription = subscribeToUserOrders(user.id, (payload) => {
           if (!active) return;
-          console.log("Real-time orders update received:", payload);
           if (payload.eventType === 'INSERT') {
             const newOrd = payload.new as SupabaseOrder;
-            setOrders(prev => {
-              if (prev.some(o => o.order_id === newOrd.order_id)) return prev;
-              const next = [newOrd, ...prev];
-              next.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-              return next;
-            });
-            // Update listing as sold locally if list contains it
-            if (newOrd.product_id) {
-              setListings(prev => prev.map(l => l.id === newOrd.product_id ? { ...l, status: 'sold' } : l));
-            }
+            supabaseOrders = [newOrd, ...supabaseOrders];
+            // Note: Keep listing active (do not automatically update local listing status to sold)
           } else if (payload.eventType === 'UPDATE') {
             const updatedOrd = payload.new as SupabaseOrder;
-            setOrders(prev => prev.map(o => (o.order_id === updatedOrd.order_id || o.id === updatedOrd.id) ? updatedOrd : o));
+            supabaseOrders = supabaseOrders.map(o => (o.order_id === updatedOrd.order_id || o.id === updatedOrd.id) ? updatedOrd : o);
           } else if (payload.eventType === 'DELETE') {
             const deletedOrd = payload.old as SupabaseOrder;
-            setOrders(prev => prev.filter(o => o.order_id !== deletedOrd.order_id && o.id !== deletedOrd.id));
+            supabaseOrders = supabaseOrders.filter(o => o.order_id !== deletedOrd.order_id && o.id !== deletedOrd.id);
           }
+          updateAndMergeAllOrders();
         });
       } catch (err) {
-        console.warn("Error initializing supabase orders:", err);
+        console.warn("Supabase orders load skipped/failed:", err);
       }
     };
 
-    loadOrders();
+    loadSupabaseOrders();
 
     return () => {
       active = false;
-      if (subscription) {
-        supabase?.removeChannel(subscription);
+      unsubscribeFirestoreBuyer();
+      unsubscribeFirestoreSeller();
+      if (supabaseSubscription) {
+        supabase?.removeChannel(supabaseSubscription);
       }
     };
   }, [user]);
@@ -2824,120 +2864,76 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!user) throw new Error('You must be logged in to buy items.');
 
     try {
-      if (!supabase) {
-        // Fallback to offline local storage if supabase is not connected!
-        const orderId = 'ORD-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-        const localNewOrder: SupabaseOrder = {
-          ...orderData,
-          order_id: orderId,
-          payment_method: 'Meetup',
-          order_status: 'Pending',
-          created_at: new Date().toISOString()
-        };
+      // 1. Generate unique Alphanumeric Order ID
+      const orderId = 'ORD-' + Math.random().toString(36).substring(2, 10).toUpperCase();
 
-        const updatedOrders = [localNewOrder, ...orders];
-        setOrders(updatedOrders);
-        localStorage.setItem(`orders_${user.id}`, JSON.stringify(updatedOrders));
-        
-        // Also sync list locally
-        setListings(prev => prev.map(l => l.id === orderData.product_id ? { ...l, status: 'sold' } : l));
-        
-        // We can write to firestore listings as well to display sold state on the web
+      // Retrieve seller_id with a reliable fallback
+      let determinedSellerId = orderData.seller_id || (orderData as any).sellerId || '';
+      if (!determinedSellerId && orderData.product_id) {
+        const foundListing = listings.find(l => l.id === orderData.product_id);
+        if (foundListing) {
+          determinedSellerId = foundListing.sellerId;
+        }
+      }
+      
+      const firestoreOrder: SupabaseOrder = {
+        ...orderData,
+        order_id: orderId,
+        id: orderId,
+        buyer_id: user.id,
+        buyer_name: user.fullName || 'Student Buyer',
+        buyer_email: user.email || '',
+        seller_id: determinedSellerId,
+        payment_method: 'Meetup',
+        order_status: 'Pending',
+        created_at: new Date().toISOString()
+      };
+
+      // 2. Create in Firestore as primary trade database record
+      try {
+        await setDoc(doc(db, 'orders', orderId), firestoreOrder);
+        console.log("Order successfully created in Firestore:", orderId);
+      } catch (fe: any) {
+        console.error("Firestore order creation failed:", fe);
+        throw new Error("Failed to save order to Firebase: " + fe.message);
+      }
+
+      // 3. Keep listing active as requested (do not automatically mark as sold on Firebase)
+
+      // 4. Try to write to Supabase (if connected) as mirror/backup
+      if (supabase) {
         try {
-          const listingRef = doc(db, 'listings', orderData.product_id);
-          await updateDoc(listingRef, {
-            status: 'sold',
-            updatedAt: serverTimestamp()
-          });
-        } catch (err) {
-          console.warn("Failed to mark listing as sold on Firebase:", err);
-        }
-
-        addNotification(`Order placed successfully for ${orderData.product_name}!`, 'success');
-        return localNewOrder;
-      }
-
-      let result;
-      try {
-        result = await createSupabaseOrder({
-          ...orderData,
-          buyer_id: user.id,
-          buyer_name: user.fullName
-        });
-      } catch (dbErr: any) {
-        console.warn("Failed to create order in Supabase. Checking if orders table is missing:", dbErr);
-        const errMsg = dbErr?.message || "";
-        const isTableMissing = dbErr?.code === '42P01' || 
-                              errMsg.includes('orders') || 
-                              errMsg.includes('schema cache') || 
-                              errMsg.includes('relation') ||
-                              dbErr?.status === 404;
-
-        if (isTableMissing) {
-          // Fallback to offline local storage if supabase table is not created yet
-          const orderId = 'ORD-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-          const localNewOrder: SupabaseOrder = {
-            ...orderData,
-            order_id: orderId,
-            id: orderId,
-            buyer_id: user.id,
-            buyer_name: user.fullName,
-            payment_method: 'Meetup',
-            order_status: 'Pending',
-            created_at: new Date().toISOString()
-          };
-
-          const updatedOrders = [localNewOrder, ...orders];
-          setOrders(updatedOrders);
-          localStorage.setItem(`orders_${user.id}`, JSON.stringify(updatedOrders));
-          
-          setListings(prev => prev.map(l => l.id === orderData.product_id ? { ...l, status: 'sold' } : l));
-          
-          try {
-            const listingRef = doc(db, 'listings', orderData.product_id);
-            await updateDoc(listingRef, {
-              status: 'sold',
-              updatedAt: serverTimestamp()
-            });
-          } catch (err) {
-            console.warn("Failed to mark listing as sold on Firebase:", err);
-          }
-
-          addNotification(`The 'orders' table is not yet created in your Supabase database. Your order was securely saved locally for now!`, 'info');
-          return localNewOrder;
-        } else {
-          addNotification(`Order Creation Failed: ${dbErr.message || dbErr}`, 'error');
-          throw dbErr;
+          await supabase.from('orders').insert([{
+            ...firestoreOrder,
+            id: orderId
+          }]);
+          // Note: Keep listing active (do not update status to sold on Supabase)
+        } catch (dbErr) {
+          console.warn("Mirror write to Supabase failed:", dbErr);
         }
       }
 
-      // Mark product as sold in listings
+      // 5. Update local storage for buyer/seller fallback backup
       try {
-        const listingRef = doc(db, 'listings', orderData.product_id);
-        await updateDoc(listingRef, {
-          status: 'sold',
-          updatedAt: serverTimestamp()
-        });
-      } catch (err) {
-        console.warn("Failed to mark listing as sold on Firebase:", err);
+        const stored = localStorage.getItem(`orders_${user.id}`);
+        const localOrders: SupabaseOrder[] = stored ? JSON.parse(stored) : [];
+        const updatedLocal = [firestoreOrder, ...localOrders];
+        localStorage.setItem(`orders_${user.id}`, JSON.stringify(updatedLocal));
+      } catch (lsErr) {
+        console.warn("Local storage update warning:", lsErr);
       }
 
-      // Supabase mirror update
-      try {
-        await supabase.from('listings').update({ status: 'sold' }).eq('id', orderData.product_id);
-      } catch (err) {
-        console.warn("Failed to mark listing as sold in Supabase:", err);
-      }
-
-      // Add to local state manually to ensure prompt update
-      setOrders(prev => [result, ...prev]);
+      // 6. Update local state
+      setOrders(prev => {
+        if (prev.some(o => o.order_id === orderId)) return prev;
+        return [firestoreOrder, ...prev];
+      });
 
       addNotification(`Order placed successfully!`, 'success');
-      return result;
+      return firestoreOrder;
     } catch (error: any) {
-      if (!error?.message?.includes('schema cache') && !error?.message?.includes('orders')) {
-        addNotification(`Order Creation Failed: ${error.message || error}`, 'error');
-      }
+      console.error("Failed to execute createOrder:", error);
+      addNotification(`Order Creation Failed: ${error.message || error}`, 'error');
       throw error;
     }
   };
@@ -2945,79 +2941,19 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const updateOrderStatus = async (orderId: string, status: SupabaseOrder['order_status']) => {
     if (!user) return;
     try {
-      if (!supabase) {
-        // Local state update fallback
-        setOrders(prev => {
-          const next = prev.map(o => o.order_id === orderId ? { ...o, order_status: status } : o);
-          localStorage.setItem(`orders_${user.id}`, JSON.stringify(next));
-          return next;
-        });
-        
-        // Also handle listing status reversal if order is cancelled
-        if (status === 'Cancelled') {
-          const order = orders.find(o => o.order_id === orderId);
-          if (order) {
-            try {
-              const listingRef = doc(db, 'listings', order.product_id);
-              await updateDoc(listingRef, {
-                status: 'active',
-                updatedAt: serverTimestamp()
-              });
-            } catch (err) {
-              console.warn("Failed to mark listing active on firestore:", err);
-            }
-          }
-        }
-
-        addNotification(`Order status updated to ${status}!`, 'success');
-        return;
-      }
-
+      // 1. Update status in Firestore (as primary database record)
       try {
-        await updateSupabaseOrderStatus(orderId, status);
-      } catch (dbErr: any) {
-        console.warn("Failed to update order status in Supabase. Checking if table is missing:", dbErr);
-        const errMsg = dbErr?.message || "";
-        const isTableMissing = dbErr?.code === '42P01' || 
-                              errMsg.includes('orders') || 
-                              errMsg.includes('schema cache') || 
-                              errMsg.includes('relation') ||
-                              dbErr?.status === 404;
-
-        if (isTableMissing) {
-          setOrders(prev => {
-            const next = prev.map(o => o.order_id === orderId ? { ...o, order_status: status } : o);
-            localStorage.setItem(`orders_${user.id}`, JSON.stringify(next));
-            return next;
-          });
-
-          if (status === 'Cancelled') {
-            const order = orders.find(o => o.order_id === orderId);
-            if (order) {
-              setListings(prev => prev.map(l => l.id === order.product_id ? { ...l, status: 'active' } : l));
-              try {
-                const listingRef = doc(db, 'listings', order.product_id);
-                await updateDoc(listingRef, {
-                  status: 'active',
-                  updatedAt: serverTimestamp()
-                });
-              } catch (err) {
-                console.warn("Failed to mark listing active on firestore:", err);
-              }
-            }
-          }
-
-          addNotification(`Local order status updated to ${status} successfully!`, 'success');
-          return;
-        } else {
-          throw dbErr;
-        }
+        const orderRef = doc(db, 'orders', orderId);
+        await updateDoc(orderRef, {
+          order_status: status
+        });
+        console.log(`Order status updated to ${status} in Firestore for:`, orderId);
+      } catch (fe) {
+        console.error("Firestore order status update failed:", fe);
+        throw new Error("Failed to update status in Firebase: " + (fe as any).message);
       }
 
-      // Local update as callback failsafe
-      setOrders(prev => prev.map(o => o.order_id === orderId ? { ...o, order_status: status } : o));
-
-      // Also reset product back to 'active' if seller cancels
+      // 2. Also handle listing status reversal if order is cancelled
       if (status === 'Cancelled') {
         const order = orders.find(o => o.order_id === orderId);
         if (order) {
@@ -3027,14 +2963,48 @@ const AppProvider = ({ children }: { children: React.ReactNode }) => {
               status: 'active',
               updatedAt: serverTimestamp()
             });
-            await supabase.from('listings').update({ status: 'active' }).eq('id', order.product_id);
+            setListings(prev => prev.map(l => l.id === order.product_id ? { ...l, status: 'active' } : l));
           } catch (err) {
-            console.warn("Failed to revert listing status:", err);
+            console.warn("Failed to mark listing active on firestore:", err);
           }
         }
       }
 
-      addNotification(`Order status updated to ${status}!`, 'info');
+      // 3. Mirror update to Supabase (if connected)
+      if (supabase) {
+        try {
+          await supabase
+            .from('orders')
+            .update({ order_status: status })
+            .or(`order_id.eq.${orderId},id.eq.${orderId}`);
+          
+          if (status === 'Cancelled') {
+            const order = orders.find(o => o.order_id === orderId);
+            if (order) {
+              await supabase.from('listings').update({ status: 'active' }).eq('id', order.product_id);
+            }
+          }
+        } catch (dbErr) {
+          console.warn("Mirror update to Supabase failed:", dbErr);
+        }
+      }
+
+      // 4. Update local storage backup
+      try {
+        const stored = localStorage.getItem(`orders_${user.id}`);
+        if (stored) {
+          const localOrders: SupabaseOrder[] = JSON.parse(stored);
+          const updatedLocal = localOrders.map(o => o.order_id === orderId ? { ...o, order_status: status } : o);
+          localStorage.setItem(`orders_${user.id}`, JSON.stringify(updatedLocal));
+        }
+      } catch (lsErr) {
+        console.warn("Local storage update warning:", lsErr);
+      }
+
+      // 5. Update local state
+      setOrders(prev => prev.map(o => o.order_id === orderId ? { ...o, order_status: status } : o));
+
+      addNotification(`Order status updated to ${status}!`, 'success');
     } catch (err: any) {
       console.error("Failed to update order status:", err);
       addNotification(`Failed to update status: ${err.message || err}`, 'error');
@@ -3599,8 +3569,13 @@ const ChatPage = () => {
 };
 
 const SellerDashboardPage = () => {
-  const { user, reviews, myListings, replyToReview, archiveReview, reportReview, markAsSold, deleteListing, isSupabaseConnected, orders, updateOrderStatus } = useApp();
+  const { user, logout, reviews, myListings, replyToReview, archiveReview, reportReview, markAsSold, deleteListing, isSupabaseConnected, orders, updateOrderStatus } = useApp();
   if (!user) return null;
+
+  if (user.id === 'mp3cXxRdbycE2ffhXwmC2kblZYF2') {
+    return <AdminDashboard onLogout={logout} />;
+  }
+
   return (
     <SellerDashboard 
       user={user} 
@@ -3749,7 +3724,7 @@ const OnboardingPage = () => {
     } as React.CSSProperties;
 
     return (
-        <div className="min-h-screen md:h-screen w-full bg-[#08231a] relative flex items-center justify-center p-0 md:p-4 lg:p-8 font-sans overflow-y-auto md:overflow-hidden select-none">
+        <div className="min-h-screen w-full bg-[#08231a] relative flex items-center justify-center p-0 md:p-4 lg:p-8 font-sans overflow-y-auto select-none md:py-12">
             {/* Visual background decorations in screenshot style - light slates on mobile, emerald on desktop */}
             <div className="absolute inset-0 bg-[radial-gradient(#14532d_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-40"></div>
             
@@ -3773,7 +3748,7 @@ const OnboardingPage = () => {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: "easeOut" }}
-                className="relative w-full h-fit md:h-[min(680px,90vh)] md:max-w-[1120px] bg-white md:bg-[#0E3D2F]/10 md:backdrop-blur-xl md:rounded-3xl md:border md:border-white/[0.08] md:shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col md:flex-row overflow-hidden z-10"
+                className="relative w-full h-fit md:min-h-[640px] md:max-w-[1120px] bg-white md:bg-[#0E3D2F]/10 md:backdrop-blur-xl md:rounded-3xl md:border md:border-white/[0.08] md:shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col md:flex-row overflow-hidden z-10"
             >
                 {/* Left Hand Side: Dynamic interactive step illustration and explicit core benefit lists (Desktop only) */}
                 <div className="hidden md:flex md:w-[48%] bg-white flex-col justify-between p-8 xl:p-10 relative overflow-hidden select-none border-r border-[#14532D]/10">
@@ -3898,10 +3873,10 @@ const OnboardingPage = () => {
                 </div>
 
                 {/* Right Hand Side: Beautiful card-based interactive form container. Uses gorgeous consistent dark-green/white styling */}
-                <div className="w-full md:w-[52%] bg-gradient-to-br from-[#0B3D2E] via-[#0D4F3B] to-[#14532D] flex flex-col justify-center items-center px-4 py-8 sm:p-6 md:p-8 relative select-none min-h-screen md:min-h-0 h-auto md:h-full overflow-y-auto md:overflow-hidden">
+                <div className="w-full md:w-[52%] bg-gradient-to-br from-[#0B3D2E] via-[#0D4F3B] to-[#14532D] flex flex-col justify-center items-center px-4 py-8 sm:p-6 md:p-8 relative select-none min-h-screen md:min-h-[640px] h-auto md:h-auto overflow-y-auto md:overflow-y-auto">
                     
                     {/* Main White Card of the onboarding page */}
-                    <div className="w-full max-w-[440px] bg-white rounded-3xl shadow-[0_24px_60px_rgba(8,30,22,0.45)] border border-slate-100 p-5 sm:p-6 md:p-8 flex flex-col justify-between relative z-10 h-auto md:h-full md:max-h-[580px] overflow-y-auto md:overflow-visible">
+                    <div className="w-full max-w-[440px] bg-white rounded-3xl shadow-[0_24px_60px_rgba(8,30,22,0.45)] border border-slate-100 p-5 sm:p-6 md:p-8 flex flex-col justify-between relative z-10 h-auto md:h-auto md:min-h-[560px] overflow-y-auto md:overflow-y-auto">
                         
                         {/* Integrated Top Header with Skip Button */}
                         <div className="flex items-center justify-between w-full mb-4 pb-3 border-b border-slate-100 shrink-0">
@@ -4723,7 +4698,7 @@ const TutorialManager = () => {
 };
 
 const AppContent = () => {
-  const { loading, user } = useApp();
+  const { loading, user, logout } = useApp();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -4761,40 +4736,44 @@ const AppContent = () => {
                 <Route path="/" element={isMobile ? <Navigate to="/login" replace /> : <LandingPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/onboarding" element={
-                  user ? <OnboardingPage /> : <Navigate to="/login" replace />
+                  user ? (user.id === 'mp3cXxRdbycE2ffhXwmC2kblZYF2' ? <Navigate to="/dashboard" replace /> : <OnboardingPage />) : <Navigate to="/login" replace />
                 } />
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/contact" element={<ContactPage />} />
                 <Route path="/privacy" element={<PrivacyPolicyPage />} />
                 <Route path="/*" element={
                   <ProtectedRoute>
-                    <div className="min-h-screen bg-bg-light font-sans pt-16">
-                      <Navbar />
-                      <div className="flex max-w-[1280px] mx-auto h-[calc(100vh-64px)] overflow-hidden">
-                        <Sidebar />
-                        <main className="flex-1 flex flex-col pb-20 md:pb-0 overflow-hidden relative">
-                          <Routes>
-                            <Route path="/" element={<Navigate to="/market" replace />} />
-                            <Route path="/market" element={<HomePage />} />
-                            <Route path="/categories" element={<CategoriesPage />} />
-                            <Route path="/favorites" element={<FavoritesPage />} />
-                            <Route path="/sell" element={<SellPage />} />
-                            <Route path="/profile" element={<ProfilePage />} />
-                            <Route path="/profile/:id" element={<PublicProfilePage />} />
-                            <Route path="/purchases" element={<TransactionsPage />} />
-                            <Route path="/verify" element={<VerificationPage />} />
-                            <Route path="/listing/:id" element={<ListingDetail />} />
-                            <Route path="/chat/:id" element={<ChatPage />} />
-                            <Route path="/messages" element={<MessagesListPage />} />
-                            <Route path="/edit-profile" element={<EditProfilePage />} />
-                            <Route path="/settings" element={<SecuritySettingsPage />} />
-                            <Route path="/dashboard" element={<SellerDashboardPage />} />
-                          </Routes>
-                        </main>
-                        <RightPanel />
+                    {user?.id === 'mp3cXxRdbycE2ffhXwmC2kblZYF2' ? (
+                      <AdminDashboard onLogout={logout} />
+                    ) : (
+                      <div className="min-h-screen bg-bg-light font-sans pt-16">
+                        <Navbar />
+                        <div className="flex max-w-[1280px] mx-auto h-[calc(100vh-64px)] overflow-hidden">
+                          <Sidebar />
+                          <main className="flex-1 flex flex-col pb-20 md:pb-0 overflow-hidden relative">
+                            <Routes>
+                              <Route path="/" element={<Navigate to="/market" replace />} />
+                              <Route path="/market" element={<HomePage />} />
+                              <Route path="/categories" element={<CategoriesPage />} />
+                              <Route path="/favorites" element={<FavoritesPage />} />
+                              <Route path="/sell" element={<SellPage />} />
+                              <Route path="/profile" element={<ProfilePage />} />
+                              <Route path="/profile/:id" element={<PublicProfilePage />} />
+                              <Route path="/purchases" element={<TransactionsPage />} />
+                              <Route path="/verify" element={<VerificationPage />} />
+                              <Route path="/listing/:id" element={<ListingDetail />} />
+                              <Route path="/chat/:id" element={<ChatPage />} />
+                              <Route path="/messages" element={<MessagesListPage />} />
+                              <Route path="/edit-profile" element={<EditProfilePage />} />
+                              <Route path="/settings" element={<SecuritySettingsPage />} />
+                              <Route path="/dashboard" element={<SellerDashboardPage />} />
+                            </Routes>
+                          </main>
+                          <RightPanel />
+                        </div>
+                        <MobileTabs />
                       </div>
-                      <MobileTabs />
-                    </div>
+                    )}
                   </ProtectedRoute>
                 } />
               </Routes>
@@ -4822,7 +4801,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   
   // If user is authenticated but not onboarded, they must go to onboarding
-  if (user && !user.onboarded && location.pathname !== '/onboarding') {
+  if (user && !user.onboarded && user.id !== 'mp3cXxRdbycE2ffhXwmC2kblZYF2' && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
   }
 
